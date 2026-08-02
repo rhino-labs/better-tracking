@@ -1,0 +1,82 @@
+{
+  "name": "better-tracking",
+  "version": "0.1.0",
+  "description": "Tiny auto-detecting event tracking: one track() call fans out to every ad pixel on the page (Meta, GA4, TikTok, LinkedIn, Reddit, X).",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./adapters/*": {
+      "types": "./dist/adapters/*.d.ts",
+      "import": "./dist/adapters/*.js"
+    },
+    "./bt.js": {
+      "types": "./dist/bt.d.ts",
+      "default": "./dist/bt.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && cp src/bt.d.ts dist/bt.d.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "size": "size-limit",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run size",
+    "changeset": "changeset",
+    "release": "changeset publish",
+    "prepublishOnly": "node -e \"if(!process.env.CI)throw new Error('publish from CI only')\""
+  },
+  "size-limit": [
+    {
+      "name": "core + all adapters (ESM)",
+      "path": "dist/index.js",
+      "limit": "3 KB"
+    },
+    {
+      "name": "IIFE script tag (bt.js)",
+      "path": "dist/bt.js",
+      "limit": "3 KB"
+    }
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "keywords": [
+    "analytics",
+    "tracking",
+    "pixel",
+    "facebook-pixel",
+    "meta-pixel",
+    "ga4",
+    "gtag",
+    "tiktok-pixel",
+    "linkedin-insight",
+    "reddit-pixel",
+    "twitter-pixel",
+    "conversion-tracking"
+  ],
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/cli": "^2.27.0",
+    "@size-limit/preset-small-lib": "^11.1.0",
+    "eslint": "^9.15.0",
+    "publint": "^0.3.0",
+    "size-limit": "^11.1.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.15.0",
+    "vitest": "^3.0.0"
+  }
+}
