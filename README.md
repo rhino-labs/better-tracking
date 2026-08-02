@@ -138,6 +138,22 @@ declare module 'better-tracking' {
 }
 ```
 
+## Consent (GDPR)
+
+The library ships no consent banner and talks to no CMP — `consent` is a single
+predicate you supply, and it's the hook for "no tracking before opt-in" compliance:
+
+```ts
+configure({ consent: () => window.__consent === true });
+```
+
+While the predicate returns `false`, nothing is dispatched to any pixel (or to the
+relay) — events queue instead. The queue is re-checked shortly after consent flips
+(covering the common case where the user's banner click triggers no `track()` call),
+then drains in order with per-vendor replay intact. Wire the predicate to whatever
+your CMP exposes (OneTrust, Cookiebot, a custom banner — any `() => boolean` works).
+If you never set `consent`, the gate is inert and events dispatch immediately.
+
 ## Event mapping
 
 | Canonical | Meta | GA4 | TikTok | Reddit |
