@@ -1,6 +1,7 @@
 import type { Adapter, CommonParams, EventParams } from '../types';
 
-const g = globalThis as { uetq?: Array<unknown> | { push: (...args: unknown[]) => void } };
+// the pre-SDK uetq array and the loaded SDK object are both used only via .push
+const g = globalThis as { uetq?: { push: (...args: unknown[]) => void } };
 
 function toUetParams(params: Readonly<EventParams>): Record<string, unknown> {
   const { value, currency, items, query, ...rest } = params as CommonParams & EventParams;

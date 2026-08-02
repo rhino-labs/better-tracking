@@ -2,21 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createNextRoute, createPagesApiHandler } from '../src/next';
 import { createStartRoute } from '../src/tanstack-start';
 
-const body = JSON.stringify({
-  v: 1,
-  event_id: 'e1',
-  type: 'track',
-  event: 'purchase',
-  params: { value: 1, currency: 'USD' },
-  ts: 1,
-  url: '',
-  referrer: '',
-  signals: {},
-  sent: [],
-});
+import { okFetch, relayPayload } from './helpers';
 
-const okFetch = (): typeof fetch =>
-  vi.fn(() => Promise.resolve(new Response('{}', { status: 200 }))) as unknown as typeof fetch;
+const body = JSON.stringify(relayPayload({ event_id: 'e1', params: { value: 1, currency: 'USD' } }));
 
 describe('framework wrappers', () => {
   it('createNextRoute exposes a POST handler backed by the relay', async () => {

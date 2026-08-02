@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adapters } from '../src/adapters';
 import { createTracker } from '../src/core';
+import { makeFbq } from './helpers';
 
 type G = Record<string, unknown>;
 const g = globalThis as G;
 const VENDOR_GLOBALS = ['fbq', 'gtag', 'dataLayer', 'ttq', 'lintrk', 'rdt', 'twq'];
-
-const makeFbq = () => Object.assign(vi.fn(), { callMethod: () => undefined });
 
 beforeEach(() => {
   vi.useFakeTimers();

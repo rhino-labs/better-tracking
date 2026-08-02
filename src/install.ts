@@ -1,4 +1,5 @@
-import * as api from './index';
+import { configure, detected, identify, on, page, track } from './index';
+import { hasOwn } from './mapping';
 
 /**
  * Installs the global `bt` command dispatcher and replays any pre-load
@@ -18,20 +19,21 @@ interface Stub {
 
 const w = globalThis as { bt?: Stub };
 
-const COMMANDS: readonly string[] = ['track', 'page', 'identify', 'configure', 'on', 'detected'];
+// The typed dispatch table doubles as the allowlist: names not in it (incl.
+// Object.prototype members) never resolve. `use()` is deliberately absent —
+// opt-in adapters take object arguments the string dispatcher can't carry,
+// so they are ESM-only.
+const CMDS = { track, page, identify, configure, on, detected };
 
 const run = (...cmd: Command): void => {
   const [name, ...args] = cmd;
-  // allowlist: never resolve arbitrary names (Object.prototype members,
-  // non-command exports) through the namespace object
-  if (!COMMANDS.includes(name)) return;
-  const fn = (api as Record<string, unknown>)[name];
-  if (typeof fn === 'function') {
-    try {
-      (fn as (...a: unknown[]) => void)(...args);
-    } catch {
-      /* a malformed command must not break the page or drop the rest of the queue */
-    }
+  if (!hasOwn(CMDS, name)) return;
+  try {
+    // overloaded signatures (track) don't fit a uniform table type; the
+    // hasOwn gate above makes the loose call safe
+    (CMDS as unknown as Record<string, (...a: unknown[]) => void>)[name]?.(...args);
+  } catch {
+    /* a malformed command must not break the page or drop the rest of the queue */
   }
 };
 

@@ -1,6 +1,6 @@
 /** Relay beacon path (PRD §12.3): payload shape, dedup id parity, sent list. */
 import { expect, test } from '@playwright/test';
-import { SNIPPETS, buildHtml, getCalls, serve } from './helpers';
+import { SNIPPETS, buildHtml, getCalls, registerRoutes, serve } from './helpers';
 
 test('relay beacon carries the canonical event, match signals, and the pixel dedup id', async ({
   page,
@@ -52,13 +52,10 @@ test('click ids from the landing URL are captured into relay signals', async ({ 
     beacons.push(JSON.parse(route.request().postData() ?? 'null'));
     await route.fulfill({ status: 202, body: '{}' });
   });
-  // serve() registers the SDK stubs and the real bt.js route
-  await serve(page, buildHtml({}));
-  await page.route('https://site.test/?fbclid=FB123&gclid=G456', (route) =>
-    route.fulfill({
-      contentType: 'text/html',
-      body: buildHtml({ after: [`bt('configure',{relay:true});bt('track','sign_up');`] }),
-    }),
+  await registerRoutes(
+    page,
+    buildHtml({ after: [`bt('configure',{relay:true});bt('track','sign_up');`] }),
+    'https://site.test/?fbclid=FB123&gclid=G456',
   );
   await page.goto('https://site.test/?fbclid=FB123&gclid=G456');
 

@@ -1,3 +1,4 @@
+import { metaContents } from '../contents';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
 interface Fbq {
@@ -16,7 +17,7 @@ function toMetaParams(params: Readonly<EventParams>): Record<string, unknown> {
     p['search_string'] = query;
   }
   if (items) {
-    p['contents'] = items.map((i) => ({ id: i.id, quantity: i.quantity ?? 1, item_price: i.price }));
+    p['contents'] = metaContents(items);
     const ids = items.map((i) => i.id).filter((id): id is string => id !== undefined);
     if (ids.length > 0) p['content_ids'] = ids;
     p['content_type'] = 'product';

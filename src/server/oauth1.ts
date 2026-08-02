@@ -11,6 +11,8 @@ export interface OAuth1Keys {
   accessTokenSecret: string;
 }
 
+const ENC = new TextEncoder();
+
 // RFC 3986 percent-encoding (stricter than encodeURIComponent)
 export const rfc3986 = (s: string): string =>
   encodeURIComponent(s).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -18,12 +20,12 @@ export const rfc3986 = (s: string): string =>
 async function hmacSha1(key: string, base: string): Promise<string> {
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(key),
+    ENC.encode(key),
     { name: 'HMAC', hash: 'SHA-1' },
     false,
     ['sign'],
   );
-  const sig = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(base));
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, ENC.encode(base));
   let bin = '';
   for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b);
   return btoa(bin);
@@ -49,7 +51,8 @@ export async function oauth1Header(
   for (const [k, v] of Object.entries(oauth)) params.push([k, v]);
   const paramString = params
     .map(([k, v]) => [rfc3986(k), rfc3986(v)] as const)
-    .sort(([ak, av], [bk, bv]) => (ak === bk ? av.localeCompare(bv) : ak.localeCompare(bk)))
+    // RFC 5849 §3.4.1.3.2 requires byte-order comparison, not locale order
+    .sort(([ak, av], [bk, bv]) => (ak === bk ? (av < bv ? -1 : 1) : ak < bk ? -1 : 1))
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
 

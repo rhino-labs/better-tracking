@@ -24,7 +24,9 @@ jobs:
         run: npm run typecheck
       - if: matrix.node == 22
         run: npm run lint
-      - run: npm run build
+      # build output is only consumed by the node-22 gates (size/publint/attw)
+      - if: matrix.node == 22
+        run: npm run build
       - if: matrix.node == 22
         run: npm run size
       - if: matrix.node == 22

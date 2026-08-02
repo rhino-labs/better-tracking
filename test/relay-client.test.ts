@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adapters } from '../src/adapters';
 import { createTracker } from '../src/core';
+import { makeFbq } from './helpers';
 import type { RelayPayload } from '../src/types';
 
 type G = Record<string, unknown>;
@@ -26,6 +27,7 @@ describe('relay transport (client)', () => {
   afterEach(() => {
     delete (globalThis as { navigator?: unknown }).navigator;
     delete g['fbq'];
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -48,8 +50,7 @@ describe('relay transport (client)', () => {
   });
 
   it('marks vendors the pixel path delivered to, and shares the same event_id with pixels', async () => {
-    const fbq = Object.assign(vi.fn(), { callMethod: () => undefined });
-    g['fbq'] = fbq;
+    const fbq = (g['fbq'] = makeFbq());
     const t = createTracker(adapters);
     t.configure({ relay: '/collect' });
     t.track('sign_up');
@@ -89,7 +90,6 @@ describe('relay transport (client)', () => {
       }),
     );
     expect(relayed).toHaveLength(1);
-    vi.unstubAllGlobals();
   });
 
   it('emits relay-error when fetch rejects', async () => {
@@ -103,7 +103,6 @@ describe('relay transport (client)', () => {
     t.configure({ relay: true });
     t.track('sign_up');
     await vi.waitFor(() => expect(errors).toHaveLength(1));
-    vi.unstubAllGlobals();
   });
 
   it('respects the consent gate: no beacon until granted', () => {

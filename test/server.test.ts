@@ -2,35 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createRelay } from '../src/server/index';
 import { oauth1Header } from '../src/server/oauth1';
 import { hashEmail, normalizePhone, sha256Hex } from '../src/hash';
-import type { RelayPayload } from '../src/types';
-
-const okFetch = (): ReturnType<typeof vi.fn> =>
-  vi.fn(() => Promise.resolve(new Response('{}', { status: 200 })));
-
-const payload = (over?: Partial<RelayPayload>): RelayPayload => ({
-  v: 1,
-  event_id: 'evt-1',
-  type: 'track',
-  event: 'purchase',
-  params: { value: 49.99, currency: 'USD' },
-  ts: 1700000000000,
-  url: 'https://shop.example/checkout',
-  referrer: 'https://google.com',
-  signals: { _fbp: 'fb.1.123', _ga: 'GA1.1.111.222', ttclid: 'ttc-1' },
-  sent: ['meta'],
-  ...over,
-});
-
-const post = (body: unknown): Request =>
-  new Request('http://x/api/events', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-forwarded-for': '1.2.3.4, 10.0.0.1',
-      'user-agent': 'UA/1.0',
-    },
-    body: JSON.stringify(body),
-  });
+import { okFetch, relayPayload as payload, relayRequest as post, sentRequest } from './helpers';
 
 describe('relay.handle validation', () => {
   it('rejects non-POST, malformed JSON, and bad shapes', async () => {
@@ -69,10 +41,9 @@ describe('meta sender', () => {
     const res = await relay.handle(post(payload({ traits: { email: ' A@B.co ' } })));
     expect(res.status).toBe(202);
 
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    const { url, body } = sentRequest(f);
     expect(url).toContain('graph.facebook.com/v21.0/px1/events');
     expect(url).toContain('access_token=tok');
-    const body = JSON.parse(init.body as string);
     expect(body.test_event_code).toBe('TEST1');
     const evt = body.data[0];
     expect(evt).toMatchObject({
@@ -104,9 +75,8 @@ describe('ga4 sender dedup policy', () => {
     const f = okFetch();
     const relay = createRelay({ ga4: { measurementId: 'G-1', apiSecret: 's' }, fetch: f });
     await relay.handle(post(payload({ sent: [] })));
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    const { url, body } = sentRequest(f);
     expect(url).toContain('measurement_id=G-1');
-    const body = JSON.parse(init.body as string);
     expect(body.client_id).toBe('111.222');
     expect(body.events[0]).toMatchObject({ name: 'purchase' });
   });
@@ -173,9 +143,8 @@ describe('config-gated vendors', () => {
     expect(f).not.toHaveBeenCalled();
 
     await relay.send('purchase', { value: 10, currency: 'EUR' }, { user: { email: 'a@b.co' } });
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    const { url, body } = sentRequest(f);
     expect(url).toContain('linkedin.com/rest/conversionEvents');
-    const body = JSON.parse(init.body as string);
     expect(body.conversion).toBe('urn:lla:llaPartnerConversion:999');
     expect(body.conversionValue).toEqual({ currencyCode: 'EUR', amount: '10' });
     expect(body.user.userIds[0].idType).toBe('SHA256_EMAIL');
@@ -195,12 +164,11 @@ describe('config-gated vendors', () => {
       fetch: f,
     });
     await relay.handle(post(payload({ signals: { twclid: 'clid-1' } })));
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    const { url, init, body } = sentRequest(f);
     expect(url).toContain('ads-api.x.com/12/measurement/conversions/o1234');
     const headers = init.headers as Record<string, string>;
     expect(headers['authorization']).toMatch(/^OAuth oauth_consumer_key="ck"/);
     expect(headers['authorization']).toContain('oauth_signature=');
-    const body = JSON.parse(init.body as string);
     expect(body.conversions[0]).toMatchObject({
       event_id: 'tw-o1234-abcde',
       conversion_id: 'evt-1',
@@ -212,9 +180,8 @@ describe('config-gated vendors', () => {
     const f = okFetch();
     const relay = createRelay({ reddit: { pixelId: 't2_x', accessToken: 't' }, fetch: f });
     await relay.send('demo_booked', {}, { event_id: 'e9' });
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    const { url, body } = sentRequest(f);
     expect(url).toContain('ads-api.reddit.com');
-    const body = JSON.parse(init.body as string);
     expect(body.events[0].event_type).toEqual({
       tracking_type: 'Custom',
       custom_event_name: 'demo_booked',

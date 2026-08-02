@@ -5,45 +5,34 @@
  */
 import { configure, detected, on } from './index';
 import { installBt } from './install';
+import type { VendorId } from './types';
 
-interface Row {
-  time: string;
-  type: string;
-  vendor: string;
-  event: string;
-  event_id: string;
-  params: string;
-}
-
-const rows: Row[] = [];
+const HINTS: Partial<Record<VendorId, string>> = {
+  x: "X conversion events need per-event ids — configure({ map: { purchase: { x: 'tw-xxxxx-yyyyy' } } }). Without them only the base pixel fires.",
+  linkedin:
+    "LinkedIn conversions need conversion_ids — configure({ map: { purchase: { linkedin: '12345' } } }). Without them only LinkedIn's automatic page tracking runs.",
+};
 
 installBt();
 configure({ debug: true });
 
 on('detect', ({ vendor }) => {
   console.info(`[bt] detected: ${vendor} (now: ${detected().join(', ')})`);
-  if (vendor === 'x') {
-    console.info(
-      "[bt] hint: X conversion events need per-event ids — configure({ map: { purchase: { x: 'tw-xxxxx-yyyyy' } } }). Without them only the base pixel fires.",
-    );
-  }
-  if (vendor === 'linkedin') {
-    console.info(
-      "[bt] hint: LinkedIn conversions need conversion_ids — configure({ map: { purchase: { linkedin: '12345' } } }). Without them only LinkedIn's automatic page tracking runs.",
-    );
-  }
+  const hint = HINTS[vendor];
+  if (hint !== undefined) console.info('[bt] hint:', hint);
 });
 
 on('dispatch', ({ vendor, type, event, params, event_id }) => {
-  rows.push({
-    time: new Date().toISOString().slice(11, 23),
-    type,
-    vendor,
-    event: event ?? '',
-    event_id,
-    params: params ? JSON.stringify(params) : '',
-  });
-  console.table(rows);
+  console.table([
+    {
+      time: new Date().toISOString().slice(11, 23),
+      type,
+      vendor,
+      event: event ?? '',
+      event_id,
+      params: params ? JSON.stringify(params) : '',
+    },
+  ]);
 });
 
 on('relay', ({ url, payload }) => {

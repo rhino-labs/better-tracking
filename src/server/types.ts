@@ -1,11 +1,13 @@
-import type { EventParams, RelayPayload, VendorId } from '../types';
+import type { EventParams, RelayPayload, Traits, VendorId } from '../types';
 
 export type { RelayPayload };
 
-/** Raw (unhashed) identity accepted by send(); hashed before any vendor call. */
-export interface UserTraits {
-  email?: string;
-  phone?: string;
+/**
+ * Raw (unhashed) identity accepted by send(); hashed before any vendor call.
+ * Extends the client's Traits shape — `user_id` and `external_id` are the
+ * same field (the client says user_id, vendor APIs say external_id).
+ */
+export interface UserTraits extends Traits {
   external_id?: string;
 }
 
@@ -99,5 +101,12 @@ export type SendResult =
 
 export interface Sender {
   readonly id: VendorId;
+  /**
+   * Delivery policy, enforced by the relay fan-out: 'fallback' sends only
+   * events the client pixel did NOT deliver (per the payload's `sent` list);
+   * 'always' (default) sends everything. GA4 defaults to 'fallback' because
+   * it has no server/pixel dedup (PRD §12.7).
+   */
+  readonly mode?: 'fallback' | 'always';
   send(event: ServerEvent): Promise<string | void>;
 }

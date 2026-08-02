@@ -1,3 +1,4 @@
+import { tiktokContents } from '../contents';
 import { hashEmail, hashPhone } from '../hash';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
@@ -12,14 +13,7 @@ const g = globalThis as { ttq?: Ttq };
 function toTikTokParams(params: Readonly<EventParams>): Record<string, unknown> {
   const { items, ...rest } = params as CommonParams & EventParams;
   const p: Record<string, unknown> = { ...rest };
-  if (items) {
-    p['contents'] = items.map((i) => ({
-      content_id: i.id,
-      content_name: i.name,
-      quantity: i.quantity ?? 1,
-      price: i.price,
-    }));
-  }
+  if (items) p['contents'] = tiktokContents(items);
   return p;
 }
 

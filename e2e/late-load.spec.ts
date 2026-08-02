@@ -106,11 +106,11 @@ test('GTM-late injection: pixel appearing seconds after load still receives earl
   page,
 }) => {
   await serve(page, buildHtml({ after: [TRACK] }));
-  await page.waitForTimeout(1000); // past the first two probe ticks
+  await page.waitForTimeout(600); // past the first probe tick at 500ms
   await injectSnippet(page, 'reddit'); // what a GTM tag firing late does
   await expect
     .poll(async () => purchases((await getCalls(page))['reddit'], (c) => c[1] === 'Purchase').length, {
-      timeout: 8000, // next probe tick is at 3s
+      timeout: 8000, // next probe ticks at 1.5s/3s
     })
     .toBe(1);
 });

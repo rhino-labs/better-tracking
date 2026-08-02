@@ -88,19 +88,23 @@ export type RelayConfig =
       transform?: (payload: RelayPayload) => unknown;
     };
 
-/** Versioned envelope POSTed to the relay endpoint (one event per beacon). */
+/**
+ * Versioned envelope POSTed to the relay endpoint (one event per beacon).
+ * For `type: 'page'`, `params` carries the page props — the discriminant says
+ * how to read them. Optional fields are `| undefined` so the client can build
+ * the payload as one literal (JSON.stringify drops undefined values).
+ */
 export interface RelayPayload {
   v: 1;
   event_id: string;
   type: 'track' | 'page' | 'identify';
-  event?: string;
-  params?: EventParams;
-  props?: PageProps;
-  traits?: Traits;
+  event?: string | undefined;
+  params?: EventParams | undefined;
+  traits?: Traits | undefined;
   /** epoch ms at track() time */
   ts: number;
-  url: string;
-  referrer: string;
+  url?: string | undefined;
+  referrer?: string | undefined;
   /** vendor cookies + click ids present at init (see collector) */
   signals: Record<string, string>;
   /** vendors the pixel path successfully dispatched to (server dedup policy input) */

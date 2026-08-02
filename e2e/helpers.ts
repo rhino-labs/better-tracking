@@ -20,14 +20,29 @@ export const SNIPPETS: Record<string, string> = {
   linkedin: `window._linkedin_partner_id="123";window._linkedin_data_partner_ids=window._linkedin_data_partner_ids||[];window._linkedin_data_partner_ids.push("123");(function(l){if(!l){window.lintrk=function(a,b){window.lintrk.q.push([a,b])};window.lintrk.q=[]}var b=document.createElement("script");b.async=true;b.src="https://snap.licdn.com/li.lms-analytics/insight.min.js";document.head.appendChild(b)})(window.lintrk);`,
 };
 
+/**
+ * Recorder "SDK" template for the four vendors whose stub snippets share the
+ * same shape: a global fn with a drain method and a pending-command queue.
+ * The recorder installs the drain, replays the queue, and logs every call
+ * into window.__calls[vendor] — exactly what the real SDK does, minus the
+ * network.
+ */
+const queueStub = (vendor: string, global: string, drain: string, queue: string): string =>
+  `(function(){var r=(window.__calls=window.__calls||{});r.${vendor}=r.${vendor}||[];` +
+  `var n=window.${global};if(!n)return;` +
+  `n.${drain}=function(){r.${vendor}.push([].slice.call(arguments))};` +
+  `(n.${queue}||[]).forEach(function(a){n.${drain}.apply(n,a)});n.${queue}=[];})();`;
+
 /** Recorder "SDKs" served in place of each vendor's real SDK response. */
 const SDK_STUBS: Record<string, string> = {
-  'connect.facebook.net': `(function(){var r=(window.__calls=window.__calls||{});r.meta=r.meta||[];var n=window.fbq;if(!n)return;n.callMethod=function(){r.meta.push([].slice.call(arguments))};(n.queue||[]).forEach(function(a){n.callMethod.apply(n,a)});n.queue=[];})();`,
+  'connect.facebook.net': queueStub('meta', 'fbq', 'callMethod', 'queue'),
+  'www.redditstatic.com': queueStub('reddit', 'rdt', 'sendEvent', 'callQueue'),
+  'static.ads-twitter.com': queueStub('x', 'twq', 'exe', 'queue'),
+  // linkedin's stub replaces the global outright rather than installing a drain
+  'snap.licdn.com': `(function(){var r=(window.__calls=window.__calls||{});r.linkedin=r.linkedin||[];var q=(window.lintrk&&window.lintrk.q)||[];window.lintrk=function(){r.linkedin.push([].slice.call(arguments))};q.forEach(function(a){window.lintrk.apply(null,a)});})();`,
+  // ga4 processes the dataLayer array; tiktok's ttq is an array with methods
   'www.googletagmanager.com': `(function(){var r=(window.__calls=window.__calls||{});r.ga4=r.ga4||[];var dl=window.dataLayer=window.dataLayer||[];function log(a){r.ga4.push(a&&typeof a.length==='number'?[].slice.call(a):a)}dl.forEach(log);var push=dl.push.bind(dl);dl.push=function(a){log(a);return push(a)};})();`,
   'analytics.tiktok.com': `(function(){var r=(window.__calls=window.__calls||{});r.tiktok=r.tiktok||[];var t=window.ttq;if(!t)return;([].slice.call(t)).forEach(function(a){r.tiktok.push(a)});t.track=function(){r.tiktok.push(['track'].concat([].slice.call(arguments)))};t.page=function(){r.tiktok.push(['page'])};t.identify=function(){r.tiktok.push(['identify'].concat([].slice.call(arguments)))};})();`,
-  'www.redditstatic.com': `(function(){var r=(window.__calls=window.__calls||{});r.reddit=r.reddit||[];var p=window.rdt;if(!p)return;p.sendEvent=function(){r.reddit.push([].slice.call(arguments))};(p.callQueue||[]).forEach(function(a){p.sendEvent.apply(p,a)});p.callQueue=[];})();`,
-  'static.ads-twitter.com': `(function(){var r=(window.__calls=window.__calls||{});r.x=r.x||[];var s=window.twq;if(!s)return;s.exe=function(){r.x.push([].slice.call(arguments))};(s.queue||[]).forEach(function(a){s.exe.apply(s,a)});s.queue=[];})();`,
-  'snap.licdn.com': `(function(){var r=(window.__calls=window.__calls||{});r.linkedin=r.linkedin||[];var q=(window.lintrk&&window.lintrk.q)||[];window.lintrk=function(){r.linkedin.push([].slice.call(arguments))};q.forEach(function(a){window.lintrk.apply(null,a)});})();`,
 };
 
 export const BT_STUB = `window.bt=window.bt||function(){(bt.q=bt.q||[]).push(arguments)};`;
@@ -37,8 +52,6 @@ export interface PageOptions {
   before?: string[];
   /** inline scripts placed after the bt.js script tag */
   after?: string[];
-  /** omit the bt.js script tag entirely */
-  noBt?: boolean;
 }
 
 export function buildHtml(opts: PageOptions): string {
@@ -46,24 +59,29 @@ export function buildHtml(opts: PageOptions): string {
   return [
     '<!doctype html><html><head><meta charset="utf-8">',
     ...(opts.before ?? []).map(script),
-    opts.noBt ? '' : '<script src="/bt.js"></script>',
+    '<script src="/bt.js"></script>',
     ...(opts.after ?? []).map(script),
     '</head><body>ok</body></html>',
   ].join('\n');
 }
 
+/** Register the SDK-stub and bt.js routes plus a page body for the given URL. */
+export async function registerRoutes(page: Page, html: string, url = 'https://site.test/'): Promise<void> {
+  await Promise.all([
+    ...Object.entries(SDK_STUBS).map(([host, stub]) =>
+      page.route(`https://${host}/**`, (route) =>
+        route.fulfill({ contentType: 'application/javascript', body: stub }),
+      ),
+    ),
+    page.route('https://site.test/bt.js', (route) =>
+      route.fulfill({ contentType: 'application/javascript', body: BT_JS }),
+    ),
+    page.route(url, (route) => route.fulfill({ contentType: 'text/html', body: html })),
+  ]);
+}
+
 export async function serve(page: Page, html: string): Promise<void> {
-  for (const [host, stub] of Object.entries(SDK_STUBS)) {
-    await page.route(`https://${host}/**`, (route) =>
-      route.fulfill({ contentType: 'application/javascript', body: stub }),
-    );
-  }
-  await page.route('https://site.test/bt.js', (route) =>
-    route.fulfill({ contentType: 'application/javascript', body: BT_JS }),
-  );
-  await page.route('https://site.test/', (route) =>
-    route.fulfill({ contentType: 'text/html', body: html }),
-  );
+  await registerRoutes(page, html);
   await page.goto('https://site.test/');
 }
 

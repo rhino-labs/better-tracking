@@ -23,7 +23,7 @@ export async function deliver(
   fetchImpl: typeof fetch,
   url: string,
   init: RequestInit,
-): Promise<Response> {
+): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(BACKOFF_MS * 2 ** (attempt - 1));
@@ -32,7 +32,11 @@ export async function deliver(
         ...init,
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      if (res.ok) return res;
+      if (res.ok) {
+        // release the connection: an unconsumed body pins the socket (undici)
+        void res.body?.cancel().catch(() => undefined);
+        return;
+      }
       const err = new VendorHttpError(res.status, await res.text().catch(() => ''));
       if (res.status !== 429 && res.status < 500) throw err;
       lastError = err;
@@ -43,3 +47,16 @@ export async function deliver(
   }
   throw lastError;
 }
+
+/** The shape every sender ends with: JSON POST via deliver(). */
+export const postJson = (
+  fetchImpl: typeof fetch,
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<void> =>
+  deliver(fetchImpl, url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });

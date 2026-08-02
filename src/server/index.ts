@@ -68,15 +68,24 @@ export interface Relay {
 }
 
 async function hashTraits(traits: UserTraits | undefined): Promise<HashedUser> {
+  const [em, ph] = await Promise.all([
+    traits?.email ? hashEmail(traits.email) : undefined,
+    traits?.phone ? hashPhone(traits.phone) : undefined,
+  ]);
   const user: HashedUser = {};
-  if (traits?.email !== undefined && traits.email !== '') user.em = await hashEmail(traits.email);
-  if (traits?.phone !== undefined && traits.phone !== '') user.ph = await hashPhone(traits.phone);
-  if (traits?.external_id !== undefined) user.external_id = traits.external_id;
+  if (em !== undefined) user.em = em;
+  if (ph !== undefined) user.ph = ph;
+  // client identify() says user_id; vendor APIs say external_id — same field
+  const id = traits?.external_id ?? traits?.user_id;
+  if (id !== undefined) user.external_id = id;
   return user;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+const optRecord = (v: unknown): boolean => v === undefined || isRecord(v);
+const optString = (v: unknown): boolean => v === undefined || typeof v === 'string';
 
 /** Structural validation of the public beacon body — this endpoint WILL be probed. */
 function parsePayload(raw: unknown): RelayPayload | undefined {
@@ -86,15 +95,13 @@ function parsePayload(raw: unknown): RelayPayload | undefined {
   if (type !== 'track' && type !== 'page' && type !== 'identify') return undefined;
   if (typeof raw['event_id'] !== 'string' || raw['event_id'].length > 128) return undefined;
   if (typeof raw['ts'] !== 'number' || !Number.isFinite(raw['ts'])) return undefined;
-  if (raw['event'] !== undefined && typeof raw['event'] !== 'string') return undefined;
-  if (raw['params'] !== undefined && !isRecord(raw['params'])) return undefined;
-  if (raw['traits'] !== undefined && !isRecord(raw['traits'])) return undefined;
-  if (!isRecord(raw['signals'] ?? {})) return undefined;
+  if (!optString(raw['event']) || !optString(raw['url']) || !optString(raw['referrer']))
+    return undefined;
+  if (!optRecord(raw['params']) || !optRecord(raw['traits']) || !optRecord(raw['signals']))
+    return undefined;
   if (raw['sent'] !== undefined && !Array.isArray(raw['sent'])) return undefined;
   return raw as unknown as RelayPayload;
 }
-
-const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 export function createRelay(options: RelayOptions): Relay {
   const fetchImpl = options.fetch ?? fetch;
@@ -110,6 +117,11 @@ export function createRelay(options: RelayOptions): Relay {
   const fanOut = async (event: ServerEvent): Promise<SendResult[]> =>
     Promise.all(
       senders.map(async (s): Promise<SendResult> => {
+        // per-vendor delivery policy (PRD §12.7): fallback-mode senders skip
+        // events the client pixel already delivered
+        if (s.mode === 'fallback' && event.sent.includes(s.id)) {
+          return { vendor: s.id, ok: true, skipped: 'pixel already delivered (fallback mode)' };
+        }
         try {
           const skipped = await s.send(event);
           return skipped === undefined
@@ -147,17 +159,18 @@ export function createRelay(options: RelayOptions): Relay {
       // stateless relay: identify-only beacons carry no event to fan out
       if (payload.type === 'identify') return new Response(null, { status: 204 });
 
+      // for type:'page' the params slot carries the page props
       const name = payload.type === 'page' ? 'page_view' : (payload.event ?? '');
       if (name === '') return new Response(null, { status: 400 });
 
       const traits = payload.traits;
       const event: ServerEvent = {
         name,
-        params: payload.params ?? (payload.props as EventParams | undefined) ?? {},
+        params: payload.params ?? {},
         event_id: payload.event_id,
         ts: payload.ts,
-        url: str(payload.url),
-        referrer: str(payload.referrer),
+        url: payload.url ?? '',
+        referrer: payload.referrer ?? '',
         signals: Object.fromEntries(
           Object.entries(payload.signals ?? {}).filter(([, v]) => typeof v === 'string'),
         ) as Record<string, string>,
@@ -171,10 +184,14 @@ export function createRelay(options: RelayOptions): Relay {
       if (ua !== null) event.ua = ua;
 
       const results = await fanOut(event);
-      return new Response(JSON.stringify({ results: results.map(({ vendor, ok }) => ({ vendor, ok })) }), {
-        status: 202,
-        headers: { 'content-type': 'application/json' },
-      });
+      // skip reasons are the operator's main debugging signal — surface them;
+      // errors stay out of the public response body
+      return new Response(
+        JSON.stringify({
+          results: results.map((r) => (r.ok ? r : { vendor: r.vendor, ok: false })),
+        }),
+        { status: 202, headers: { 'content-type': 'application/json' } },
+      );
     },
 
     async send(event: string, params?: EventParams, opts?: SendOptions) {

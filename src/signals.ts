@@ -9,12 +9,6 @@ const CLICK_IDS = ['fbclid', 'ttclid', 'li_fat_id', 'rdt_cid', 'twclid', 'gclid'
 
 let clickIds: Record<string, string> | undefined;
 
-function readCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  const m = ('; ' + document.cookie).split('; ' + name + '=')[1];
-  return m ? decodeURIComponent(m.split(';')[0] ?? '') : undefined;
-}
-
 /** Capture click ids from the current URL (call once at init). */
 export function captureClickIds(): void {
   if (clickIds !== undefined || typeof location === 'undefined') return;
@@ -28,9 +22,14 @@ export function captureClickIds(): void {
 
 export function collectSignals(): Record<string, string> {
   const out: Record<string, string> = { ...clickIds };
-  for (const name of COOKIES) {
-    const v = readCookie(name);
-    if (v !== undefined && v !== '') out[name] = v;
+  if (typeof document !== 'undefined') {
+    // one cookie-jar read per collect, not one per cookie name
+    const jar = '; ' + document.cookie;
+    for (const name of COOKIES) {
+      const m = jar.split('; ' + name + '=')[1];
+      const v = m ? decodeURIComponent(m.split(';')[0] ?? '') : '';
+      if (v !== '') out[name] = v;
+    }
   }
   return out;
 }

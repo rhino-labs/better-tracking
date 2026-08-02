@@ -103,11 +103,11 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     }
   };
 
-  const relay = (entry: Entry): void => {
+  const relay = (entry: Entry, signals: Record<string, string>): void => {
     const r = cfg.relay;
     if (r === undefined) return;
     const custom = typeof r === 'object' ? r : undefined;
-    const url = r === true ? '/api/events' : typeof r === 'string' ? r : r.url;
+    const url = typeof r === 'object' ? r.url : r === true ? '/api/events' : r;
     entry.relayed = true;
     const payload: RelayPayload = {
       v: 1,
@@ -116,13 +116,12 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
       ts: entry.ts,
       url: globalThis.location?.href ?? '',
       referrer: globalThis.document?.referrer ?? '',
-      signals: collectSignals(),
+      signals,
       sent: Object.keys(entry.sent) as VendorId[],
+      event: entry.event,
+      params: entry.params ?? entry.props,
+      traits: entry.traits,
     };
-    if (entry.event !== undefined) payload.event = entry.event;
-    if (entry.params !== undefined) payload.params = entry.params;
-    if (entry.props !== undefined) payload.props = entry.props;
-    if (entry.traits !== undefined) payload.traits = entry.traits;
     try {
       const body = JSON.stringify(custom?.transform ? custom.transform(payload) : payload);
       let ok = false;
@@ -157,6 +156,8 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
       }
       return;
     }
+    // one cookie-jar read per flush, shared by every relayed entry
+    let signals: Record<string, string> | undefined;
     for (const entry of log) {
       for (const adapter of adapters) {
         if (found.has(adapter.id) && !cfg.disable?.includes(adapter.id) && !entry.sent[adapter.id]) {
@@ -165,7 +166,7 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
       }
       // relay after the pixel pass so `sent` reflects what pixels received
       // (the server's dedup policy input, e.g. GA4 fallback-only)
-      if (!entry.relayed) relay(entry);
+      if (cfg.relay !== undefined && !entry.relayed) relay(entry, (signals ??= collectSignals()));
     }
   };
 
