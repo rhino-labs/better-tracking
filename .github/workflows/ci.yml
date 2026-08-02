@@ -8,6 +8,32 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # server package supports Node 18+ (PRD §12.8); build/lint gate on 22
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - if: matrix.node == 22
+        run: npm run typecheck
+      - if: matrix.node == 22
+        run: npm run lint
+      - run: npm run build
+      - if: matrix.node == 22
+        run: npm run size
+      - if: matrix.node == 22
+        run: npx publint
+      - if: matrix.node == 22
+        run: npx attw --pack . --profile esm-only
+
+  e2e:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,10 +41,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
       - run: npm run build
-      - run: npm run size
-      - run: npx publint
-      - run: npx attw --pack . --profile esm-only
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test

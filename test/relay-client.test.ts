@@ -7,7 +7,7 @@ type G = Record<string, unknown>;
 const g = globalThis as G;
 
 const lastBeaconJson = (beacon: ReturnType<typeof vi.fn>): Promise<RelayPayload> => {
-  const blob = beacon.mock.calls.at(-1)?.[1] as Blob;
+  const blob = beacon.mock.calls.slice(-1)[0]?.[1] as Blob;
   return blob.text().then((t) => JSON.parse(t) as RelayPayload);
 };
 
@@ -122,7 +122,7 @@ describe('relay transport (client)', () => {
     const t = createTracker(adapters);
     t.configure({ relay: { url: '/x', transform: (p) => ({ wrapped: p.event }) } });
     t.track('sign_up');
-    const blob = beacon.mock.calls.at(-1)?.[1] as Blob;
+    const blob = beacon.mock.calls.slice(-1)[0]?.[1] as Blob;
     expect(JSON.parse(await blob.text())).toEqual({ wrapped: 'sign_up' });
   });
 });

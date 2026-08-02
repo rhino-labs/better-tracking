@@ -54,7 +54,8 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run size",
     "changeset": "changeset",
     "release": "changeset publish",
-    "prepublishOnly": "node -e \"if(!process.env.CI)throw new Error('publish from CI only')\""
+    "prepublishOnly": "node -e \"if(!process.env.CI)throw new Error('publish from CI only')\"",
+    "e2e": "playwright test"
   },
   "size-limit": [
     {
@@ -89,6 +90,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^2.27.0",
+    "@playwright/test": "^1.62.1",
     "@size-limit/preset-small-lib": "^11.1.0",
     "eslint": "^9.15.0",
     "publint": "^0.3.0",

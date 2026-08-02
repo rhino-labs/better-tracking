@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>better-tracking — live smoke page</title>
+<!--
+  Live smoke page (PRD §7.10): loads all six REAL vendor pixels so releases
+  can be manually verified with the vendors' pixel-helper browser extensions
+  (Meta Pixel Helper, Tag Assistant, TikTok Pixel Helper, …).
+
+  ⚠ Replace every REPLACE_ME id with your test-account ids before use, then
+  serve this file over HTTP(S) — file:// blocks most pixel SDKs:
+      npx serve demo
+-->
+
+<!-- Meta Pixel -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', 'REPLACE_ME_META_PIXEL_ID');
+</script>
+
+<!-- GA4 (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=REPLACE_ME_GA4_ID"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'REPLACE_ME_GA4_ID');
+</script>
+
+<!-- TikTok Pixel -->
+<script>
+!function (w, d, t) {
+  w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+  ttq.load('REPLACE_ME_TIKTOK_PIXEL_CODE');
+  ttq.page();
+}(window, document, 'ttq');
+</script>
+
+<!-- LinkedIn Insight -->
+<script>
+_linkedin_partner_id = "REPLACE_ME_LINKEDIN_PARTNER_ID";
+window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+(function(l){if(!l){window.lintrk=function(a,b){window.lintrk.q.push([a,b])};window.lintrk.q=[]}
+var s=document.getElementsByTagName("script")[0];var b=document.createElement("script");
+b.type="text/javascript";b.async=true;b.src="https://snap.licdn.com/li.lms-analytics/insight.min.js";
+s.parentNode.insertBefore(b,s)})(window.lintrk);
+</script>
+
+<!-- Reddit Pixel -->
+<script>
+!function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js";t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);
+rdt('init','REPLACE_ME_REDDIT_PIXEL_ID');
+rdt('track','PageVisit');
+</script>
+
+<!-- X Pixel -->
+<script>
+!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+twq('config','REPLACE_ME_X_PIXEL_ID');
+</script>
+
+<!-- better-tracking (debug build: rich console output) -->
+<script>window.bt=window.bt||function(){(bt.q=bt.q||[]).push(arguments)}</script>
+<script src="../dist/bt.debug.js" defer></script>
+<script>
+bt('configure', {
+  // X + LinkedIn conversions need account-specific ids:
+  map: { purchase: { x: 'REPLACE_ME_TW_EVENT_ID', linkedin: 'REPLACE_ME_LI_CONVERSION_ID' } },
+  // relay: '/api/events',  // uncomment to smoke-test the server relay too
+});
+bt('on', 'dispatch', (d) => console.log('dispatch', d));
+</script>
+
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1rem; }
+  button { display: block; width: 100%; margin: .5rem 0; padding: .75rem; font-size: 1rem; cursor: pointer; }
+  code { background: #eee; padding: .1em .3em; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>better-tracking smoke page</h1>
+<p>Open the console (debug build logs a dispatch table) and each vendor's pixel-helper extension, then fire events:</p>
+
+<button onclick="bt('track','view_item',{items:[{id:'sku1',name:'Widget',price:49.99,quantity:1}]})">view_item</button>
+<button onclick="bt('track','search',{query:'widgets'})">search</button>
+<button onclick="bt('track','add_to_cart',{value:49.99,currency:'USD',items:[{id:'sku1',price:49.99,quantity:1}]})">add_to_cart</button>
+<button onclick="bt('track','begin_checkout',{value:49.99,currency:'USD'})">begin_checkout</button>
+<button onclick="bt('track','purchase',{value:49.99,currency:'USD',items:[{id:'sku1',price:49.99,quantity:1}],transaction_id:'T-1001'})">purchase</button>
+<button onclick="bt('track','sign_up',{method:'email'})">sign_up</button>
+<button onclick="bt('track','generate_lead',{value:10,currency:'USD'})">generate_lead</button>
+<button onclick="bt('track','demo_booked',{plan:'pro'})">demo_booked (custom)</button>
+<button onclick="bt('page',{path:'/smoke',title:'Smoke'})">page()</button>
+<button onclick="bt('identify',{email:'test@example.com',user_id:'u-1'})">identify()</button>
+
+<p>Detected vendors: <code id="detected">(none yet)</code></p>
+<script>
+const found = [];
+bt('on', 'detect', ({ vendor }) => {
+  found.push(vendor);
+  document.getElementById('detected').textContent = found.join(', ');
+});
+</script>
+</body>
+</html>
