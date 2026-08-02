@@ -183,6 +183,15 @@ export function createRelay(options: RelayOptions): Relay {
       if (ip !== undefined && ip !== '') event.ip = ip;
       if (ua !== null) event.ua = ua;
 
+      // with a platform background hook, don't make the beacon (whose
+      // response the browser ignores) wait out vendor latency + retries
+      if (options.waitUntil) {
+        options.waitUntil(fanOut(event));
+        return new Response(JSON.stringify({ detached: true }), {
+          status: 202,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
       const results = await fanOut(event);
       // skip reasons are the operator's main debugging signal — surface them;
       // errors stay out of the public response body

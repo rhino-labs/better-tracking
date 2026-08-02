@@ -93,6 +93,15 @@ export interface RelayOptions {
   onError?: (vendor: VendorId, error: unknown, event: ServerEvent) => void;
   /** Override fetch (testing, custom agents). Defaults to globalThis.fetch. */
   fetch?: typeof fetch;
+  /**
+   * Detach vendor delivery from the response: handle() answers 202
+   * immediately and hands the fan-out promise here instead of awaiting it
+   * (a slow vendor otherwise holds the beacon connection open for up to
+   * ~30s of retries). Wire to your platform's background hook — Cloudflare
+   * `ctx.waitUntil`, Vercel/Next `after`. Without it, handle() awaits
+   * delivery, which serverless runtimes without such a hook require.
+   */
+  waitUntil?: (delivery: Promise<unknown>) => void;
 }
 
 export type SendResult =

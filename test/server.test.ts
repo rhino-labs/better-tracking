@@ -221,3 +221,20 @@ describe('oauth1 signer', () => {
     expect(header).toMatch(/oauth_signature="[A-Za-z0-9%]+"/);
   });
 });
+
+describe('waitUntil', () => {
+  it('responds immediately and detaches delivery to the platform hook', async () => {
+    const f = okFetch();
+    const background: Promise<unknown>[] = [];
+    const relay = createRelay({
+      meta: { pixelId: '1', accessToken: 't' },
+      waitUntil: (p) => background.push(p),
+      fetch: f,
+    });
+    const res = await relay.handle(post(payload()));
+    expect(res.status).toBe(202);
+    expect(background).toHaveLength(1);
+    await background[0];
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+});
