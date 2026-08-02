@@ -1,5 +1,6 @@
 import { configure, detected, identify, on, page, track } from './index';
 import { hasOwn } from './mapping';
+import { relayTo } from './relay';
 
 /**
  * Installs the global `bt` command dispatcher and replays any pre-load
@@ -28,6 +29,15 @@ const CMDS = { track, page, identify, configure, on, detected };
 const run = (...cmd: Command): void => {
   const [name, ...args] = cmd;
   if (!hasOwn(CMDS, name)) return;
+  // script-tag ergonomics: configure({ relay: '/x' }) / relay: true coerce to
+  // relayTo() — plain values are all a paste-in snippet can carry. This is
+  // also why bt.js ships the relay code the ESM entry tree-shakes.
+  if (name === 'configure') {
+    const c = args[0] as { relay?: unknown } | undefined;
+    if (c && (typeof c.relay === 'string' || c.relay === true)) {
+      c.relay = relayTo(c.relay === true ? undefined : c.relay);
+    }
+  }
   try {
     // overloaded signatures (track) don't fit a uniform table type; the
     // hasOwn gate above makes the loose call safe

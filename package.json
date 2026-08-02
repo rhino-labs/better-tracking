@@ -59,9 +59,15 @@
   },
   "size-limit": [
     {
-      "name": "core + all adapters (ESM)",
+      "name": "core + all adapters (ESM, full API incl. relay)",
       "path": "dist/index.js",
       "limit": "3 KB"
+    },
+    {
+      "name": "pixels only (ESM, relay tree-shaken)",
+      "path": "dist/index.js",
+      "import": "{ track, page, identify, configure, on }",
+      "limit": "2.6 KB"
     },
     {
       "name": "IIFE script tag (bt.js)",

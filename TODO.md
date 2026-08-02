@@ -31,7 +31,7 @@ Tracks work against [PRD.md](PRD.md). Status as of 2026-08-02 (evening).
 ## Done (v2)
 
 - [x] Client: `event_id` on every event, wired into pixel dedup fields (Meta `eventID`, TikTok `event_id`, Reddit `conversionId`, Snap `client_dedup_id`)
-- [x] Client: match-signal collector (vendor cookies re-read per event; click ids captured at init) + `relay` beacon transport (`sendBeacon` → `fetch keepalive`), `relay`/`relay-error` emitter events, consent-gated, `sent` list for server dedup policy
+- [x] Client: match-signal collector (vendor cookies re-read per event; click ids captured at init) + relay beacon transport via `relayTo()` (`sendBeacon` → `fetch keepalive`), `relay`/`relay-error` emitter events, consent-gated, `sent` list for server dedup policy; relay + collector live outside core and tree-shake out of ESM builds that never import `relayTo` (size-limit proves it: 2.26KB pixels-only vs 2.78KB full)
 - [x] Server: `better-tracking/server` — `createRelay`, `handle(Request)`, typed `send()`; payload validation + size cap, PII normalization + hash-at-ingest, senders for Meta/GA4/TikTok/LinkedIn/Reddit/X, bounded retry (3 attempts, 429/5xx only), allSettled-style fan-out with `onError`, test-event codes (Meta/TikTok/Reddit test_mode)
 - [x] Dependency-free OAuth 1.0a HMAC-SHA1 signer for X (WebCrypto)
 - [x] Dedup policy: same `event_id` both paths; GA4 fallback-only default (`mode: 'always'` opt-out)
@@ -54,5 +54,5 @@ Tracks work against [PRD.md](PRD.md). Status as of 2026-08-02 (evening).
 
 ## Open questions (need Ryan's call)
 
-- [ ] PRD §11: GTM-only GA4 approach (current impl pushes to dataLayer — confirm), bundle growth policy, canonical vocabulary naming, 3KB vs 2KB budget (bt.js now sits at exactly 3.00KB brotli — next feature needs a plan)
+- [ ] PRD §11: GTM-only GA4 approach (current impl pushes to dataLayer — confirm), bundle growth policy, canonical vocabulary naming, 3KB vs 2KB budget (bt.js at 2.89KB brotli after the relay extraction; pixels-only ESM at 2.26KB)
 - [ ] PRD §12.10: relay batching scope, LinkedIn token refresh ownership, monorepo split threshold

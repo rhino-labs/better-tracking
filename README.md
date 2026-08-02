@@ -90,12 +90,18 @@ and `better-tracking/server` fans it out to the vendors' server APIs (Meta CAPI,
 Measurement Protocol, TikTok Events API, LinkedIn/Reddit/X Conversions APIs) with the
 same `event_id` the pixel received, so vendors deduplicate the two paths.
 
-**Client** — one config key:
+**Client** — import the transport (it tree-shakes out entirely if you never use it,
+~0.5KB):
 
 ```ts
-configure({ relay: true });               // POSTs to /api/events
-// or: relay: '/collect'  |  relay: { url, headers?, transform? }
+import { configure, relayTo } from 'better-tracking';
+
+configure({ relay: relayTo() });          // POSTs to /api/events
+// or: relayTo('/collect')  |  relayTo({ url, headers?, transform? })
 ```
+
+Script tags keep the plain form — `bt('configure', { relay: true })` or a URL string —
+since a snippet can't carry a function (bt.js always includes the relay code).
 
 Each event gets an `event_id` (wired into `fbq` `eventID`, TikTok `event_id`, Reddit
 `conversionId`, Snap `client_dedup_id`), and the beacon carries match signals (`_fbp`,

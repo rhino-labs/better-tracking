@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adapters } from '../src/adapters';
 import { createTracker } from '../src/core';
+import { relayTo } from '../src/relay';
 import { makeFbq } from './helpers';
 import type { RelayPayload } from '../src/types';
 
@@ -33,7 +34,7 @@ describe('relay transport (client)', () => {
 
   it('beacons a versioned payload with event_id and empty sent list when no pixels exist', async () => {
     const t = createTracker(adapters);
-    t.configure({ relay: true });
+    t.configure({ relay: relayTo() });
     t.track('purchase', { value: 5, currency: 'USD' });
 
     expect(beacon).toHaveBeenCalledWith('/api/events', expect.any(Blob));
@@ -52,7 +53,7 @@ describe('relay transport (client)', () => {
   it('marks vendors the pixel path delivered to, and shares the same event_id with pixels', async () => {
     const fbq = (g['fbq'] = makeFbq());
     const t = createTracker(adapters);
-    t.configure({ relay: '/collect' });
+    t.configure({ relay: relayTo('/collect') });
     t.track('sign_up');
 
     const payload = await lastBeaconJson(beacon);
@@ -63,7 +64,7 @@ describe('relay transport (client)', () => {
 
   it('relays each event exactly once even as later probes run', () => {
     const t = createTracker(adapters);
-    t.configure({ relay: true });
+    t.configure({ relay: relayTo() });
     t.track('sign_up');
     const calls = beacon.mock.calls.length;
     t.configure({}); // triggers another probe+flush
@@ -78,7 +79,7 @@ describe('relay transport (client)', () => {
     const t = createTracker(adapters);
     const relayed: unknown[] = [];
     t.on('relay', (p) => relayed.push(p));
-    t.configure({ relay: { url: '/collect', headers: { 'x-key': 'k' } } });
+    t.configure({ relay: relayTo({ url: '/collect', headers: { 'x-key': 'k' } }) });
     t.track('sign_up');
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -100,7 +101,7 @@ describe('relay transport (client)', () => {
     const t = createTracker(adapters);
     const errors: unknown[] = [];
     t.on('relay-error', (p) => errors.push(p));
-    t.configure({ relay: true });
+    t.configure({ relay: relayTo() });
     t.track('sign_up');
     await vi.waitFor(() => expect(errors).toHaveLength(1));
   });
@@ -108,7 +109,7 @@ describe('relay transport (client)', () => {
   it('respects the consent gate: no beacon until granted', () => {
     let granted = false;
     const t = createTracker(adapters);
-    t.configure({ relay: true, consent: () => granted });
+    t.configure({ relay: relayTo(), consent: () => granted });
     t.track('purchase', { value: 1, currency: 'USD' });
     expect(beacon).not.toHaveBeenCalled();
 
@@ -119,7 +120,7 @@ describe('relay transport (client)', () => {
 
   it('applies the transform hook to the payload', async () => {
     const t = createTracker(adapters);
-    t.configure({ relay: { url: '/x', transform: (p) => ({ wrapped: p.event }) } });
+    t.configure({ relay: relayTo({ url: '/x', transform: (p) => ({ wrapped: p.event }) }) });
     t.track('sign_up');
     const blob = beacon.mock.calls.slice(-1)[0]?.[1] as Blob;
     expect(JSON.parse(await blob.text())).toEqual({ wrapped: 'sign_up' });

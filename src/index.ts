@@ -22,7 +22,6 @@ export type {
   Item,
   KnownEvent,
   PageProps,
-  RelayConfig,
   RelayPayload,
   Traits,
   ValueParams,
@@ -31,6 +30,8 @@ export type {
 export type { Tracker } from './core';
 export { createTracker } from './core';
 export { MAPPING } from './mapping';
+export { relayTo } from './relay';
+export type { RelayEvent, RelayTarget, RelayTransport } from './types';
 
 const tracker = createTracker(adapters);
 

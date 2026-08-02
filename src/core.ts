@@ -1,12 +1,11 @@
 import { hasOwn, mappedName } from './mapping';
-import { captureClickIds, collectSignals } from './signals';
 import type {
   Adapter,
   Config,
   EmitterEvents,
   EventParams,
   PageProps,
-  RelayPayload,
+  RelayEvent,
   Traits,
   VendorId,
 } from './types';
@@ -14,15 +13,7 @@ import type {
 const MAX_QUEUE = 50;
 const PROBE_DELAYS = [500, 1500, 3000, 6000, 12000];
 
-interface Entry {
-  kind: 'track' | 'page' | 'identify';
-  id: string;
-  ts: number;
-  event?: string;
-  params?: EventParams;
-  props?: PageProps;
-  traits?: Traits;
-  sent: Partial<Record<VendorId, true>>;
+interface Entry extends RelayEvent {
   relayed?: boolean;
 }
 
@@ -103,47 +94,6 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     }
   };
 
-  const relay = (entry: Entry, signals: Record<string, string>): void => {
-    const r = cfg.relay;
-    if (r === undefined) return;
-    const custom = typeof r === 'object' ? r : undefined;
-    const url = typeof r === 'object' ? r.url : r === true ? '/api/events' : r;
-    entry.relayed = true;
-    const payload: RelayPayload = {
-      v: 1,
-      event_id: entry.id,
-      type: entry.kind,
-      ts: entry.ts,
-      url: globalThis.location?.href ?? '',
-      referrer: globalThis.document?.referrer ?? '',
-      signals,
-      sent: Object.keys(entry.sent) as VendorId[],
-      event: entry.event,
-      params: entry.params ?? entry.props,
-      traits: entry.traits,
-    };
-    try {
-      const body = JSON.stringify(custom?.transform ? custom.transform(payload) : payload);
-      let ok = false;
-      // sendBeacon survives unload/bounce but can't carry headers
-      if (!custom?.headers && typeof navigator !== 'undefined' && navigator.sendBeacon) {
-        ok = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
-      }
-      if (!ok) {
-        fetch(url, {
-          method: 'POST',
-          keepalive: true,
-          headers: { 'content-type': 'application/json', ...custom?.headers },
-          body,
-        }).catch((error: unknown) => emit('relay-error', { url, error }));
-      }
-      emit('relay', { url, payload });
-    } catch (error) {
-      emit('relay-error', { url, error });
-      if (cfg.debug) console.warn('[bt] relay fail', error);
-    }
-  };
-
   const flush = (): void => {
     if (!consentOk()) {
       // consent may be granted with no further track/configure call (e.g. a
@@ -156,8 +106,6 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
       }
       return;
     }
-    // one cookie-jar read per flush, shared by every relayed entry
-    let signals: Record<string, string> | undefined;
     for (const entry of log) {
       for (const adapter of adapters) {
         if (found.has(adapter.id) && !cfg.disable?.includes(adapter.id) && !entry.sent[adapter.id]) {
@@ -165,8 +113,17 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
         }
       }
       // relay after the pixel pass so `sent` reflects what pixels received
-      // (the server's dedup policy input, e.g. GA4 fallback-only)
-      if (cfg.relay !== undefined && !entry.relayed) relay(entry, (signals ??= collectSignals()));
+      // (the server's dedup policy input, e.g. GA4 fallback-only). The
+      // transport comes from relayTo() so its code tree-shakes when unused.
+      const transport = cfg.relay;
+      if (transport !== undefined && !entry.relayed) {
+        entry.relayed = true;
+        try {
+          transport(entry, emit);
+        } catch {
+          /* a broken transport never breaks tracking */
+        }
+      }
     }
   };
 
@@ -242,8 +199,6 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     addEventListener('popstate', fire);
   };
 
-  // click ids only exist on the landing URL — capture before any SPA navigation
-  captureClickIds();
   // defer the initial probe one microtask so callers registering on('detect')
   // synchronously after creation still see init-time detections
   if (typeof queueMicrotask === 'function') queueMicrotask(probe);

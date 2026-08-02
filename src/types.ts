@@ -77,16 +77,42 @@ export interface Adapter {
   identify?(traits: Readonly<Traits>): void;
 }
 
-/** Relay endpoint config: `true` means `/api/events`. */
-export type RelayConfig =
-  | true
-  | string
-  | {
-      url: string;
-      headers?: Record<string, string>;
-      /** Last-chance payload rewrite before send. */
-      transform?: (payload: RelayPayload) => unknown;
-    };
+/** Options for relayTo() beyond a bare endpoint URL. */
+export interface RelayTarget {
+  /** Endpoint URL (default '/api/events'). */
+  url?: string;
+  /** Extra headers — forces the fetch path (sendBeacon can't carry headers). */
+  headers?: Record<string, string>;
+  /** Last-chance payload rewrite before send. */
+  transform?: (payload: RelayPayload) => unknown;
+}
+
+/**
+ * Snapshot of a queued event handed to the relay transport after the pixel
+ * pass (so `sent` reflects what pixels received — the server's dedup input).
+ */
+export interface RelayEvent {
+  kind: 'track' | 'page' | 'identify';
+  id: string;
+  /** epoch ms */
+  ts: number;
+  event?: string;
+  params?: EventParams;
+  props?: PageProps;
+  traits?: Traits;
+  sent: Partial<Record<VendorId, true>>;
+}
+
+/**
+ * Transport hook invoked once per event. Build one with relayTo() — keeping
+ * the implementation behind this function type is what lets the payload
+ * assembly, signals collector, and beacon code tree-shake out of builds that
+ * never configure a relay.
+ */
+export type RelayTransport = (
+  event: RelayEvent,
+  emit: <K extends 'relay' | 'relay-error'>(name: K, payload: EmitterEvents[K]) => void,
+) => void;
 
 /**
  * Versioned envelope POSTed to the relay endpoint (one event per beacon).
@@ -127,9 +153,10 @@ export interface Config {
   spa?: boolean;
   /**
    * Forward every event to a first-party server endpoint
-   * (better-tracking/server) via sendBeacon/fetch-keepalive. `true` = '/api/events'.
+   * (better-tracking/server): configure({ relay: relayTo('/api/events') }).
+   * The script-tag build also accepts a bare string or `true` ('/api/events').
    */
-  relay?: RelayConfig;
+  relay?: RelayTransport;
 }
 
 export interface EmitterEvents {
