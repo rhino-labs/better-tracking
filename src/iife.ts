@@ -6,5 +6,5 @@ import { adapters } from './adapters';
 import { use } from './index';
 import { installBt } from './install';
 
-for (const adapter of adapters) use(adapter);
+use(...adapters);
 installBt();

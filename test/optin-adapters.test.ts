@@ -56,4 +56,15 @@ describe('opt-in adapters via use()', () => {
     t.use(pinterest);
     expect(pintrk).toHaveBeenCalledWith('track', 'signup', expect.anything());
   });
+
+  it('use() accepts multiple adapters at once and dedupes re-registrations', () => {
+    const pintrk = (g['pintrk'] = vi.fn());
+    const snaptr = (g['snaptr'] = vi.fn());
+    const t = createTracker([]);
+    t.use(pinterest, snap, pinterest);
+    expect(t.vendors()).toEqual(['pinterest', 'snap']);
+    t.track('purchase', { value: 5, currency: 'USD' });
+    expect(pintrk).toHaveBeenCalledTimes(1);
+    expect(snaptr).toHaveBeenCalledTimes(1);
+  });
 });

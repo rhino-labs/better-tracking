@@ -1,4 +1,4 @@
-import { createTracker } from './core';
+import { createTracker, type Tracker } from './core';
 import { warnMissingAdapters } from './devwarn';
 import type {
   Adapter,
@@ -40,9 +40,19 @@ declare const __DEV__: boolean;
 
 // Core ships with NO adapters — register them via use(), one import each, or
 // import from 'better-tracking/auto' to get all six built-ins.
-const tracker = createTracker([]);
+//
+// The singleton is created lazily on the first API call so importing this
+// module has no side effects (no timers, no dev warnings) and bundlers can
+// drop it when only types are used.
+let tracker: Tracker | undefined;
 
-if (__DEV__) warnMissingAdapters(tracker);
+const getTracker = (): Tracker => {
+  if (tracker === undefined) {
+    tracker = createTracker([]);
+    if (__DEV__) warnMissingAdapters(tracker);
+  }
+  return tracker;
+};
 
 /**
  * Params tuple per event: known events get their exact param type (optional
@@ -59,40 +69,41 @@ export function track<K extends keyof EventMap | (string & {})>(
   ...args: TrackArgs<K>
 ): void;
 export function track(event: string, params?: object): void {
-  tracker.track(event, params as EventParams | undefined);
+  getTracker().track(event, params as EventParams | undefined);
 }
 
 export function page(props?: PageProps): void {
-  tracker.page(props);
+  getTracker().page(props);
 }
 
 export function identify(traits: Traits): void {
-  tracker.identify(traits);
+  getTracker().identify(traits);
 }
 
 export function configure(config: Config): void {
-  tracker.configure(config);
+  getTracker().configure(config);
 }
 
 export function on<K extends keyof EmitterEvents>(
   name: K,
   fn: (payload: EmitterEvents[K]) => void,
 ): () => void {
-  return tracker.on(name, fn);
+  return getTracker().on(name, fn);
 }
 
 export function detected(): VendorId[] {
-  return tracker.detected();
+  return getTracker().detected();
 }
 
 /**
- * Register an adapter (all adapters are opt-in on this entry; the auto entry
- * and bt.js register the six built-ins for you):
+ * Register one or more adapters (all adapters are opt-in on this entry; the
+ * auto entry and bt.js register the six built-ins for you):
  *
  *   import { use } from 'better-tracking';
  *   import { meta } from 'better-tracking/adapters/meta';
- *   use(meta);
+ *   import { ga4 } from 'better-tracking/adapters/ga4';
+ *   use(meta, ga4);
  */
-export function use(adapter: Adapter): void {
-  tracker.use(adapter);
+export function use(...adapters: Adapter[]): void {
+  getTracker().use(...adapters);
 }

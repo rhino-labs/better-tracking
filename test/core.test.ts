@@ -16,6 +16,24 @@ afterEach(() => {
   for (const name of VENDOR_GLOBALS) delete g[name];
 });
 
+describe('lazy probe scheduling', () => {
+  it('construction is pure: no timers until the first API call', () => {
+    const t = createTracker(adapters);
+    expect(vi.getTimerCount()).toBe(0);
+    t.track('sign_up');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+
+  it('on() arms probing so detect listeners see initial detections', async () => {
+    g['fbq'] = makeFbq();
+    const t = createTracker(adapters);
+    const seen: string[] = [];
+    t.on('detect', (p) => seen.push(p.vendor));
+    await Promise.resolve(); // initial probe is deferred one microtask
+    expect(seen).toContain('meta');
+  });
+});
+
 describe('detection & dispatch', () => {
   it('dispatches a purchase to every pixel present at init with vendor-native names/params', () => {
     const fbq = (g['fbq'] = makeFbq());

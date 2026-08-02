@@ -75,11 +75,14 @@ opt-in subpath import, so you ship exactly the vendors you use:
 import { track, use } from 'better-tracking';
 import { meta } from 'better-tracking/adapters/meta';
 import { ga4 } from 'better-tracking/adapters/ga4';
-use(meta);
-use(ga4);
+use(meta, ga4);
 
 track('purchase', { value: 49.99, currency: 'USD' });
 ```
+
+Importing the bare entry has no side effects — the tracker (and its pixel
+detection probes) initializes lazily on the first API call, so type-only or
+unused imports tree-shake away completely.
 
 In development builds (the standard `development` [export
 condition](https://nodejs.org/api/packages.html#conditional-exports), which Vite,
@@ -232,7 +235,7 @@ import { use } from 'better-tracking/auto';   // six built-ins already registere
 import { pinterest } from 'better-tracking/adapters/pinterest';
 import { snap } from 'better-tracking/adapters/snap';
 import { bing } from 'better-tracking/adapters/bing';
-use(pinterest); use(snap); use(bing);
+use(pinterest, snap, bing);
 ```
 
 The dev-build warning covers all nine vendors, so a pixel on the page without its

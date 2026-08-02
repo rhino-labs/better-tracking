@@ -30,8 +30,8 @@ export interface Tracker {
   detected(): VendorId[];
   /** Ids of all registered adapters (regardless of on-page detection). */
   vendors(): VendorId[];
-  /** Register an adapter (e.g. better-tracking/adapters/meta). */
-  use(adapter: Adapter): void;
+  /** Register one or more adapters (e.g. better-tracking/adapters/meta). */
+  use(...adapters: Adapter[]): void;
 }
 
 export function createTracker(initial: readonly Adapter[]): Tracker {
@@ -41,7 +41,22 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
   const log: Entry[] = [];
   const listeners: { [K in keyof EmitterEvents]?: Array<(p: EmitterEvents[K]) => void> } = {};
   let spaPatched = false;
+  let probesScheduled = false;
   let consentTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Construction is pure (no timers) so importing/creating a tracker has no
+  // side effects; the probe schedule arms on first activity. The initial
+  // probe is deferred one microtask so callers registering on('detect')
+  // synchronously after the arming call still see those detections.
+  const armProbes = (): void => {
+    if (probesScheduled) return;
+    probesScheduled = true;
+    if (typeof queueMicrotask === 'function') queueMicrotask(probe);
+    else probe();
+    if (typeof setTimeout === 'function') {
+      for (const d of PROBE_DELAYS) setTimeout(probe, d);
+    }
+  };
 
   const emit = <K extends keyof EmitterEvents>(name: K, payload: EmitterEvents[K]): void => {
     for (const fn of listeners[name] ?? []) {
@@ -147,6 +162,7 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
   };
 
   const push = (entry: Entry): void => {
+    armProbes();
     log.push(entry);
     if (log.length > MAX_QUEUE) {
       // evict fully-delivered history first so the cap bounds the pending
@@ -164,12 +180,15 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     page: (props) => push({ kind: 'page', id: newId(), ts: Date.now(), props: props ?? {}, sent: {} }),
     identify: (traits) => push({ kind: 'identify', id: newId(), ts: Date.now(), traits, sent: {} }),
     configure: (config) => {
+      armProbes();
       Object.assign(cfg, config);
       if (cfg.spa) patchSpa();
       probe();
       flush();
     },
     on: <K extends keyof EmitterEvents>(name: K, fn: (payload: EmitterEvents[K]) => void) => {
+      // listening implies wanting detection to run
+      armProbes();
       // the mapped-type store loses the K correlation; re-assert it locally
       const list = (listeners[name] ??= []) as Array<(p: EmitterEvents[K]) => void>;
       list.push(fn);
@@ -180,9 +199,15 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     },
     detected: () => [...found],
     vendors: () => adapters.map((a) => a.id),
-    use: (adapter) => {
-      if (adapters.some((a) => a.id === adapter.id)) return;
-      adapters.push(adapter);
+    use: (...incoming) => {
+      armProbes();
+      let added = false;
+      for (const adapter of incoming) {
+        if (adapters.some((a) => a.id === adapter.id)) continue;
+        adapters.push(adapter);
+        added = true;
+      }
+      if (!added) return;
       probe();
       flush();
     },
@@ -201,14 +226,6 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
     history.replaceState = wrap(history.replaceState.bind(history));
     addEventListener('popstate', fire);
   };
-
-  // defer the initial probe one microtask so callers registering on('detect')
-  // synchronously after creation still see init-time detections
-  if (typeof queueMicrotask === 'function') queueMicrotask(probe);
-  else probe();
-  if (typeof setTimeout === 'function') {
-    for (const d of PROBE_DELAYS) setTimeout(probe, d);
-  }
 
   return api;
 }

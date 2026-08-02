@@ -13,4 +13,4 @@ import { use } from './index';
 
 export * from './index';
 
-for (const adapter of adapters) use(adapter);
+use(...adapters);
