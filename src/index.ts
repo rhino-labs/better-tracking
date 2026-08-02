@@ -1,5 +1,5 @@
-import { adapters } from './adapters';
 import { createTracker } from './core';
+import { warnMissingAdapters } from './devwarn';
 import type {
   Adapter,
   Config,
@@ -33,7 +33,16 @@ export { MAPPING } from './mapping';
 export { relayTo } from './relay';
 export type { RelayEvent, RelayTarget, RelayTransport } from './types';
 
-const tracker = createTracker(adapters);
+// Replaced at build time: false in production entries (the __DEV__ branch and
+// everything it references tree-shake away), true in the `development`
+// export-condition build and bt.debug.js.
+declare const __DEV__: boolean;
+
+// Core ships with NO adapters — register them via use(), one import each, or
+// import from 'better-tracking/auto' to get all six built-ins.
+const tracker = createTracker([]);
+
+if (__DEV__) warnMissingAdapters(tracker);
 
 /**
  * Params tuple per event: known events get their exact param type (optional
@@ -77,11 +86,12 @@ export function detected(): VendorId[] {
 }
 
 /**
- * Register an opt-in adapter that isn't in the auto bundle:
+ * Register an adapter (all adapters are opt-in on this entry; the auto entry
+ * and bt.js register the six built-ins for you):
  *
  *   import { use } from 'better-tracking';
- *   import { pinterest } from 'better-tracking/adapters/pinterest';
- *   use(pinterest);
+ *   import { meta } from 'better-tracking/adapters/meta';
+ *   use(meta);
  */
 export function use(adapter: Adapter): void {
   tracker.use(adapter);

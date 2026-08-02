@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "description": "Tiny auto-detecting event tracking: one track() call fans out to every ad pixel on the page (Meta, GA4, TikTok, LinkedIn, Reddit, X).",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/auto.js",
+    "./dist/auto.dev.js",
+    "./dist/chunk-*.js"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18"
@@ -11,7 +15,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "development": "./dist/index.dev.js",
       "import": "./dist/index.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "development": "./dist/auto.dev.js",
+      "import": "./dist/auto.js"
     },
     "./adapters/*": {
       "types": "./dist/adapters/*.d.ts",
@@ -38,6 +48,7 @@
       "default": "./dist/bt.js"
     },
     "./bt.debug.js": {
+      "types": "./dist/bt.d.ts",
       "default": "./dist/bt.debug.js"
     },
     "./package.json": "./package.json"
@@ -59,15 +70,14 @@
   },
   "size-limit": [
     {
-      "name": "core + all adapters (ESM, full API incl. relay)",
+      "name": "core engine (ESM, no adapters)",
       "path": "dist/index.js",
-      "limit": "3 KB"
+      "limit": "2 KB"
     },
     {
-      "name": "pixels only (ESM, relay tree-shaken)",
-      "path": "dist/index.js",
-      "import": "{ track, page, identify, configure, on }",
-      "limit": "2.6 KB"
+      "name": "auto (engine + six adapters + relay)",
+      "path": "dist/auto.js",
+      "limit": "3 KB"
     },
     {
       "name": "IIFE script tag (bt.js)",

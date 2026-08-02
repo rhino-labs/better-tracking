@@ -28,7 +28,9 @@ export interface Tracker {
   configure(config: Config): void;
   on<K extends keyof EmitterEvents>(name: K, fn: (payload: EmitterEvents[K]) => void): () => void;
   detected(): VendorId[];
-  /** Register an opt-in adapter (e.g. better-tracking/adapters/pinterest). */
+  /** Ids of all registered adapters (regardless of on-page detection). */
+  vendors(): VendorId[];
+  /** Register an adapter (e.g. better-tracking/adapters/meta). */
   use(adapter: Adapter): void;
 }
 
@@ -177,6 +179,7 @@ export function createTracker(initial: readonly Adapter[]): Tracker {
       };
     },
     detected: () => [...found],
+    vendors: () => adapters.map((a) => a.id),
     use: (adapter) => {
       if (adapters.some((a) => a.id === adapter.id)) return;
       adapters.push(adapter);

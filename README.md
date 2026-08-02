@@ -18,11 +18,12 @@ sends **no network requests of its own** and stores nothing. This is the full pr
 detection, queueing, late-pixel replay, consent gating, SPA support.
 
 ```ts
-import { track } from 'better-tracking';
+import { track } from 'better-tracking/auto';
 track('purchase', { value: 49.99, currency: 'USD' });
 ```
 
-At 2.26KB (brotli, relay code tree-shaken) this is the mode to start with. Its ceiling
+At 2.84KB brotli for everything — or from 1.86KB + ~0.15KB per hand-picked adapter
+on the bare entry — this is the mode to start with. Its ceiling
 is the same as every pixel setup: ad blockers, Safari/Firefox cookie limits, and
 pre-load bounces eat an estimated 20–40% of conversions.
 
@@ -50,7 +51,7 @@ client changes beyond the `relayTo()` line.
 | Infra | none | your existing server or edge runtime |
 | Ad-blocked / ITP-lost conversions | lost (like any pixel setup) | recovered via server APIs |
 | Identity matching | GA4 `user_id`, TikTok hashed email/phone | + hashed identity to Meta/Reddit/LinkedIn/X |
-| Bundle | 2.26KB | 2.78KB (script tag: 2.89KB either way) |
+| Bundle | from 1.86KB (engine + chosen adapters) | + ~0.5KB relay transport (script tag: 2.96KB either way) |
 | Data path | pixels only, nothing stored | + your first-party endpoint (hash-at-ingest, never persisted) |
 
 ## Install
@@ -59,13 +60,35 @@ client changes beyond the `relayTo()` line.
 npm install better-tracking
 ```
 
+Zero-config — the `auto` entry registers all six built-in adapters:
+
 ```ts
-import { track } from 'better-tracking';
+import { track } from 'better-tracking/auto';
 
 track('purchase', { value: 49.99, currency: 'USD', items: [{ id: 'sku1', price: 49.99 }] });
 ```
 
-Or with a script tag (via jsDelivr/unpkg):
+À la carte — the bare entry is the engine only (1.86KB); every adapter is an
+opt-in subpath import, so you ship exactly the vendors you use:
+
+```ts
+import { track, use } from 'better-tracking';
+import { meta } from 'better-tracking/adapters/meta';
+import { ga4 } from 'better-tracking/adapters/ga4';
+use(meta);
+use(ga4);
+
+track('purchase', { value: 49.99, currency: 'USD' });
+```
+
+In development builds (the standard `development` [export
+condition](https://nodejs.org/api/packages.html#conditional-exports), which Vite,
+webpack, and `node --conditions=development` resolve automatically), the engine
+includes lightweight detectors for **all** known vendors and warns when a pixel is
+live on the page that has no registered adapter — so a GTM-added TikTok tag can't
+silently go untracked. The detector table compiles out of production builds.
+
+Or with a script tag (via jsDelivr/unpkg — always zero-config, all adapters included):
 
 ```html
 <script>window.bt=window.bt||function(){(bt.q=bt.q||[]).push(arguments)}</script>
@@ -197,18 +220,23 @@ export const { POST } = createNextRoute({ meta: { … } });
 // SvelteKit/Remix/Astro/Hono/Workers: export const POST = ({ request }) => relay.handle(request)
 ```
 
-## Opt-in adapters
+## Adapters
 
-Pinterest, Snap, and Microsoft/Bing UET ship as subpath adapters that stay out of the
-core bundle:
+Every adapter is a subpath import registered with `use()`. The six built-ins
+(`meta`, `ga4`, `tiktok`, `linkedin`, `reddit`, `x`) come pre-registered on
+`better-tracking/auto` and in bt.js; Pinterest, Snap, and Microsoft/Bing UET are
+always explicit:
 
 ```ts
-import { use } from 'better-tracking';
+import { use } from 'better-tracking/auto';   // six built-ins already registered
 import { pinterest } from 'better-tracking/adapters/pinterest';
 import { snap } from 'better-tracking/adapters/snap';
 import { bing } from 'better-tracking/adapters/bing';
 use(pinterest); use(snap); use(bing);
 ```
+
+The dev-build warning covers all nine vendors, so a pixel on the page without its
+adapter registered is flagged in the console whichever entry you use.
 
 ## identify()
 

@@ -1,3 +1,4 @@
+import { detectGa4 } from '../detectors';
 import type { Adapter } from '../types';
 
 const g = globalThis as {
@@ -7,7 +8,7 @@ const g = globalThis as {
 
 export const ga4: Adapter = {
   id: 'ga4',
-  detect: () => typeof g.gtag === 'function' || Array.isArray(g.dataLayer),
+  detect: detectGa4,
   track(event, params, mapped) {
     const name = mapped ?? event;
     if (typeof g.gtag === 'function') g.gtag('event', name, params);

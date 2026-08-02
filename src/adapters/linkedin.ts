@@ -1,3 +1,4 @@
+import { detectLinkedin } from '../detectors';
 import type { Adapter } from '../types';
 
 const g = globalThis as { lintrk?: (...args: unknown[]) => void };
@@ -9,7 +10,7 @@ const g = globalThis as { lintrk?: (...args: unknown[]) => void };
  */
 export const linkedin: Adapter = {
   id: 'linkedin',
-  detect: () => typeof g.lintrk === 'function',
+  detect: detectLinkedin,
   track(_event, _params, mapped) {
     const lintrk = g.lintrk;
     if (!lintrk || mapped === undefined) return false;

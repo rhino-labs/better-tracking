@@ -1,4 +1,5 @@
 import { tiktokContents } from '../contents';
+import { detectTiktok } from '../detectors';
 import { hashEmail, hashPhone } from '../hash';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
@@ -19,7 +20,7 @@ function toTikTokParams(params: Readonly<EventParams>): Record<string, unknown> 
 
 export const tiktok: Adapter = {
   id: 'tiktok',
-  detect: () => typeof g.ttq?.track === 'function',
+  detect: detectTiktok,
   track(event, params, mapped, eventId) {
     const ttq = g.ttq;
     if (!ttq) return false;

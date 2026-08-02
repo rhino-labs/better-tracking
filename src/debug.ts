@@ -3,7 +3,8 @@
  * replay as bt.js, plus rich console output. No size constraint; never ship
  * this to production pages.
  */
-import { configure, detected, on } from './index';
+import { adapters } from './adapters';
+import { configure, detected, on, use } from './index';
 import { installBt } from './install';
 import type { VendorId } from './types';
 
@@ -13,6 +14,7 @@ const HINTS: Partial<Record<VendorId, string>> = {
     "LinkedIn conversions need conversion_ids — configure({ map: { purchase: { linkedin: '12345' } } }). Without them only LinkedIn's automatic page tracking runs.",
 };
 
+for (const adapter of adapters) use(adapter);
 installBt();
 configure({ debug: true });
 

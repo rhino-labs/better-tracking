@@ -1,3 +1,4 @@
+import { detectSnap } from '../detectors';
 import { hasOwn } from '../mapping';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
@@ -31,7 +32,7 @@ function toSnapParams(params: Readonly<EventParams>): Record<string, unknown> {
 /** Opt-in adapter: `use(snap)`. Not part of the auto bundle. */
 export const snap: Adapter = {
   id: 'snap',
-  detect: () => typeof g.snaptr === 'function',
+  detect: detectSnap,
   track(event, params, mapped, eventId) {
     const snaptr = g.snaptr;
     if (!snaptr) return false;

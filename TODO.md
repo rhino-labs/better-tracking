@@ -52,6 +52,12 @@ Tracks work against [PRD.md](PRD.md). Status as of 2026-08-02 (evening).
 - [ ] v2.1: client-side batching (measured need), LinkedIn token-refresh docs, monorepo split if server surface grows past ~10KB
 - [ ] v3 (exploratory): optional pixel SDK loading, auto-capture plugin
 
+## Done (post-review restructuring)
+
+- [x] Relay extracted from core behind `relayTo()` (tree-shakeable); opt-in `waitUntil` on the server relay
+- [x] All adapters removed from the core entry: `better-tracking` = engine only (1.86KB), `better-tracking/auto` = zero-config with six built-ins (2.84KB), bt.js unchanged behavior (2.96KB)
+- [x] Shared `src/detectors.ts` + dev-only missing-adapter warnings via the `development` export condition (`__DEV__` define; index.dev.js/auto.dev.js builds; bt.debug.js includes them)
+
 ## Open questions (need Ryan's call)
 
 - [ ] PRD §11: GTM-only GA4 approach (current impl pushes to dataLayer — confirm), bundle growth policy, canonical vocabulary naming, 3KB vs 2KB budget (bt.js at 2.89KB brotli after the relay extraction; pixels-only ESM at 2.26KB)

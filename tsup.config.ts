@@ -4,6 +4,7 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
+      auto: 'src/auto.ts',
       'adapters/meta': 'src/adapters/meta.ts',
       'adapters/ga4': 'src/adapters/ga4.ts',
       'adapters/tiktok': 'src/adapters/tiktok.ts',
@@ -24,12 +25,26 @@ export default defineConfig([
     minify: true,
     treeshake: true,
     target: 'es2020',
+    define: { __DEV__: 'false' },
+  },
+  {
+    // `development` export-condition builds: same entries consumers resolve in
+    // dev servers (Vite/webpack dev, node --conditions=development) — include
+    // the missing-adapter warnings
+    entry: { 'index.dev': 'src/index.ts', 'auto.dev': 'src/auto.ts' },
+    format: ['esm'],
+    dts: false,
+    minify: false,
+    treeshake: true,
+    target: 'es2020',
+    define: { __DEV__: 'true' },
   },
   {
     entry: { bt: 'src/iife.ts' },
     format: ['iife'],
     minify: true,
     target: 'es2020',
+    define: { __DEV__: 'false' },
     outExtension: () => ({ js: '.js' }),
   },
   {
@@ -38,6 +53,7 @@ export default defineConfig([
     format: ['iife'],
     minify: false,
     target: 'es2020',
+    define: { __DEV__: 'true' },
     outExtension: () => ({ js: '.js' }),
   },
 ]);

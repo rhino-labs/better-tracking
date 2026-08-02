@@ -1,3 +1,4 @@
+import { detectPinterest } from '../detectors';
 import { hasOwn } from '../mapping';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
@@ -33,7 +34,7 @@ function toPinterestParams(params: Readonly<EventParams>): Record<string, unknow
 /** Opt-in adapter: `use(pinterest)`. Not part of the auto bundle. */
 export const pinterest: Adapter = {
   id: 'pinterest',
-  detect: () => typeof g.pintrk === 'function',
+  detect: detectPinterest,
   track(event, params, mapped) {
     const pintrk = g.pintrk;
     if (!pintrk) return false;

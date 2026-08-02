@@ -1,3 +1,4 @@
+import { detectBing } from '../detectors';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
 // the pre-SDK uetq array and the loaded SDK object are both used only via .push
@@ -21,7 +22,7 @@ function toUetParams(params: Readonly<EventParams>): Record<string, unknown> {
  */
 export const bing: Adapter = {
   id: 'bing',
-  detect: () => typeof g.uetq?.push === 'function',
+  detect: detectBing,
   track(event, params, mapped) {
     const uetq = g.uetq;
     if (!uetq) return false;

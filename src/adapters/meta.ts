@@ -1,4 +1,5 @@
 import { metaContents } from '../contents';
+import { detectMeta } from '../detectors';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
 interface Fbq {
@@ -27,8 +28,7 @@ function toMetaParams(params: Readonly<EventParams>): Record<string, unknown> {
 
 export const meta: Adapter = {
   id: 'meta',
-  // A valid stub (pre-SDK snippet) counts as detected: calling it queues natively.
-  detect: () => typeof g.fbq === 'function' && !!(g.fbq.callMethod ?? g.fbq.queue),
+  detect: detectMeta,
   track(event, params, mapped, eventId) {
     const fbq = g.fbq;
     if (!fbq) return false;

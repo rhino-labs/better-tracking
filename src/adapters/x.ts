@@ -1,3 +1,4 @@
+import { detectX } from '../detectors';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
 const g = globalThis as { twq?: (...args: unknown[]) => void };
@@ -9,7 +10,7 @@ const g = globalThis as { twq?: (...args: unknown[]) => void };
  */
 export const x: Adapter = {
   id: 'x',
-  detect: () => typeof g.twq === 'function',
+  detect: detectX,
   track(_event, params, mapped) {
     const twq = g.twq;
     if (!twq || mapped === undefined) return false;

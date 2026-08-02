@@ -1,3 +1,4 @@
+import { detectReddit } from '../detectors';
 import type { Adapter, CommonParams, EventParams } from '../types';
 
 const g = globalThis as { rdt?: (...args: unknown[]) => void };
@@ -11,7 +12,7 @@ function toRedditParams(params: Readonly<EventParams>): Record<string, unknown> 
 
 export const reddit: Adapter = {
   id: 'reddit',
-  detect: () => typeof g.rdt === 'function',
+  detect: detectReddit,
   track(event, params, mapped, eventId) {
     const rdt = g.rdt;
     if (!rdt) return false;
