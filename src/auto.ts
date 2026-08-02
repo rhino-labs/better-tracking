@@ -8,7 +8,7 @@
  * `sideEffects` so the registration below survives bundler tree-shaking even
  * on a bare `import 'better-tracking/auto'`.
  */
-import { adapters } from './adapters';
+import { adapters } from './adapters/all';
 import { use } from './index';
 
 export * from './index';

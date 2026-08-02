@@ -68,16 +68,25 @@ import { track } from 'better-tracking/auto';
 track('purchase', { value: 49.99, currency: 'USD', items: [{ id: 'sku1', price: 49.99 }] });
 ```
 
-À la carte — the bare entry is the engine only (1.86KB); every adapter is an
-opt-in subpath import, so you ship exactly the vendors you use:
+À la carte — the bare entry is the engine only (1.86KB); adapters are opt-in
+imports, so you ship exactly the vendors you use:
 
 ```ts
 import { track, use } from 'better-tracking';
-import { meta } from 'better-tracking/adapters/meta';
-import { ga4 } from 'better-tracking/adapters/ga4';
+import { meta, ga4 } from 'better-tracking/adapters';
 use(meta, ga4);
 
 track('purchase', { value: 49.99, currency: 'USD' });
+```
+
+The `better-tracking/adapters` barrel is side-effect-free, so bundlers
+tree-shake the adapters you don't import. If you don't use a bundler (CDN ESM,
+import maps), prefer the per-adapter subpaths — they never even download unused
+adapters:
+
+```ts
+import { meta } from 'better-tracking/adapters/meta';
+import { ga4 } from 'better-tracking/adapters/ga4';
 ```
 
 Importing the bare entry has no side effects — the tracker (and its pixel
@@ -241,16 +250,14 @@ export const { POST } = createNextRoute({ meta: { … } });
 
 ## Adapters
 
-Every adapter is a subpath import registered with `use()`. The six built-ins
+Every adapter is an import registered with `use()`. The six built-ins
 (`meta`, `ga4`, `tiktok`, `linkedin`, `reddit`, `x`) come pre-registered on
 `better-tracking/auto` and in bt.js; Pinterest, Snap, and Microsoft/Bing UET are
 always explicit:
 
 ```ts
 import { use } from 'better-tracking/auto';   // six built-ins already registered
-import { pinterest } from 'better-tracking/adapters/pinterest';
-import { snap } from 'better-tracking/adapters/snap';
-import { bing } from 'better-tracking/adapters/bing';
+import { pinterest, snap, bing } from 'better-tracking/adapters';
 use(pinterest, snap, bing);
 ```
 

@@ -5,8 +5,7 @@
   "type": "module",
   "sideEffects": [
     "./dist/auto.js",
-    "./dist/auto.dev.js",
-    "./dist/chunk-*.js"
+    "./dist/auto.dev.js"
   ],
   "license": "MIT",
   "engines": {
@@ -22,6 +21,10 @@
       "types": "./dist/auto.d.ts",
       "development": "./dist/auto.dev.js",
       "import": "./dist/auto.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.js"
     },
     "./adapters/*": {
       "types": "./dist/adapters/*.d.ts",
@@ -57,7 +60,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup && cp src/bt.d.ts dist/bt.d.ts",
+    "build": "rm -rf dist && tsup && cp src/bt.d.ts dist/bt.d.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
@@ -78,6 +81,12 @@
       "name": "auto (engine + six adapters + relay)",
       "path": "dist/auto.js",
       "limit": "3 KB"
+    },
+    {
+      "name": "adapters barrel tree-shakes (one adapter imported)",
+      "path": "dist/adapters/index.js",
+      "import": "{ meta }",
+      "limit": "700 B"
     },
     {
       "name": "IIFE script tag (bt.js)",

@@ -4,6 +4,9 @@ import type { KnownEvent, VendorId } from './types';
  * Canonical event → vendor-native event name. Absent entry means the vendor
  * has no native equivalent: adapters then fall back to their custom-event
  * mechanism, or skip (x/linkedin, which need per-account ids via config.map).
+ * ga4 has no table because the canonical names ARE the GA4 names — its
+ * adapter falls back to the raw event name, so an identity table here would
+ * only cost bytes.
  */
 export const MAPPING = {
   meta: {
@@ -15,16 +18,6 @@ export const MAPPING = {
     purchase: 'Purchase',
     sign_up: 'CompleteRegistration',
     generate_lead: 'Lead',
-  },
-  ga4: {
-    page_view: 'page_view',
-    view_item: 'view_item',
-    search: 'search',
-    add_to_cart: 'add_to_cart',
-    begin_checkout: 'begin_checkout',
-    purchase: 'purchase',
-    sign_up: 'sign_up',
-    generate_lead: 'generate_lead',
   },
   tiktok: {
     view_item: 'ViewContent',
@@ -44,8 +37,6 @@ export const MAPPING = {
     sign_up: 'SignUp',
     generate_lead: 'Lead',
   },
-  x: {},
-  linkedin: {},
   // opt-in vendors (pinterest/snap/bing) map inside their adapter modules so
   // their tables tree-shake out of the core bundle
 } as const satisfies Partial<Record<VendorId, Partial<Record<KnownEvent, string>>>>;

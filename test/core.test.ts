@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { adapters } from '../src/adapters';
+import { adapters } from '../src/adapters/all';
 import { createTracker } from '../src/core';
 import { makeFbq } from './helpers';
 

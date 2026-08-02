@@ -4,7 +4,7 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
-      auto: 'src/auto.ts',
+      'adapters/index': 'src/adapters/index.ts',
       'adapters/meta': 'src/adapters/meta.ts',
       'adapters/ga4': 'src/adapters/ga4.ts',
       'adapters/tiktok': 'src/adapters/tiktok.ts',
@@ -21,7 +21,20 @@ export default defineConfig([
     },
     format: ['esm'],
     dts: true,
-    clean: true,
+    minify: true,
+    treeshake: true,
+    target: 'es2020',
+    define: { __DEV__: 'false' },
+  },
+  {
+    // auto is the only side-effectful ESM entry; built without code splitting
+    // so its registration side effect stays inside auto.js itself. That keeps
+    // every shared chunk pure, so `sideEffects` can list auto.js alone and
+    // bundlers may tree-shake unused adapters out of the barrel and chunks.
+    entry: { auto: 'src/auto.ts' },
+    format: ['esm'],
+    splitting: false,
+    dts: true,
     minify: true,
     treeshake: true,
     target: 'es2020',
@@ -31,8 +44,19 @@ export default defineConfig([
     // `development` export-condition builds: same entries consumers resolve in
     // dev servers (Vite/webpack dev, node --conditions=development) — include
     // the missing-adapter warnings
-    entry: { 'index.dev': 'src/index.ts', 'auto.dev': 'src/auto.ts' },
+    entry: { 'index.dev': 'src/index.ts' },
     format: ['esm'],
+    dts: false,
+    minify: false,
+    treeshake: true,
+    target: 'es2020',
+    define: { __DEV__: 'true' },
+  },
+  {
+    // dev build of auto: splitting off for the same purity reason as above
+    entry: { 'auto.dev': 'src/auto.ts' },
+    format: ['esm'],
+    splitting: false,
     dts: false,
     minify: false,
     treeshake: true,

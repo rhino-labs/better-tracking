@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { adapters } from '../src/adapters';
+import { adapters } from '../src/adapters/all';
 import { bing } from '../src/adapters/bing';
 import { pinterest } from '../src/adapters/pinterest';
 import { snap } from '../src/adapters/snap';

@@ -3,7 +3,7 @@
  * replay as bt.js, plus rich console output. No size constraint; never ship
  * this to production pages.
  */
-import { adapters } from './adapters';
+import { adapters } from './adapters/all';
 import { configure, detected, on, use } from './index';
 import { installBt } from './install';
 import type { VendorId } from './types';
