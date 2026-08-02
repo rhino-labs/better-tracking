@@ -8,6 +8,51 @@ Tiny (<3KB gzip), zero-config event tracking. One `track()` call fans out to eve
 - **Strictly typed**: known events get autocompleted, compile-checked params; register your own events via declaration merging.
 - ESM-only, tree-shakeable adapters, plus an IIFE build for script tags.
 
+## Two modes
+
+### 1. Client-side (default) — pixels only
+
+Paste one snippet or import one function; every `track()` call fans out to the pixels
+already on the page. Nothing to host, no vendor tokens, no account IDs — the library
+sends **no network requests of its own** and stores nothing. This is the full product:
+detection, queueing, late-pixel replay, consent gating, SPA support.
+
+```ts
+import { track } from 'better-tracking';
+track('purchase', { value: 49.99, currency: 'USD' });
+```
+
+At 2.26KB (brotli, relay code tree-shaken) this is the mode to start with. Its ceiling
+is the same as every pixel setup: ad blockers, Safari/Firefox cookie limits, and
+pre-load bounces eat an estimated 20–40% of conversions.
+
+### 2. Hybrid — pixels + server relay (Conversions APIs)
+
+Everything above, **plus** each event is beaconed to a first-party endpoint you host,
+where [`better-tracking/server`](#server-side-events-conversions-apis) re-sends it
+through the vendors' server APIs (Meta CAPI, GA4 Measurement Protocol, TikTok Events
+API, LinkedIn/Reddit/X). Both paths carry the same `event_id`, so vendors deduplicate —
+dual delivery recovers blocked conversions and improves match rates.
+
+```ts
+import { configure, relayTo } from 'better-tracking';
+configure({ relay: relayTo('/api/events') });   // client: one line
+// server: createRelay({ meta: {…}, ga4: {…} }) behind that route — see below
+```
+
+Adopt incrementally: launch client-side, add the relay when the blocked-conversion gap
+starts to matter. The dedup ids flow from day one, so flipping hybrid on later needs no
+client changes beyond the `relayTo()` line.
+
+| | Client-side | Hybrid |
+|---|---|---|
+| Setup | one snippet / import | + one route in your app, vendor API tokens |
+| Infra | none | your existing server or edge runtime |
+| Ad-blocked / ITP-lost conversions | lost (like any pixel setup) | recovered via server APIs |
+| Identity matching | GA4 `user_id`, TikTok hashed email/phone | + hashed identity to Meta/Reddit/LinkedIn/X |
+| Bundle | 2.26KB | 2.78KB (script tag: 2.89KB either way) |
+| Data path | pixels only, nothing stored | + your first-party endpoint (hash-at-ingest, never persisted) |
+
 ## Install
 
 ```sh
@@ -84,9 +129,9 @@ Unknown events use each vendor's custom-event mechanism (`fbq('trackCustom', …
 
 ## Server-side events (Conversions APIs)
 
-Client pixels lose 20-40% of conversions to ad blockers and cookie limits. v2 adds an
-additive server path: the client beacons every event to a first-party endpoint you host,
-and `better-tracking/server` fans it out to the vendors' server APIs (Meta CAPI, GA4
+The server half of [hybrid mode](#2-hybrid--pixels--server-relay-conversions-apis):
+the client beacons every event to a first-party endpoint you host, and
+`better-tracking/server` fans it out to the vendors' server APIs (Meta CAPI, GA4
 Measurement Protocol, TikTok Events API, LinkedIn/Reddit/X Conversions APIs) with the
 same `event_id` the pixel received, so vendors deduplicate the two paths.
 
