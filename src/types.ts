@@ -42,7 +42,17 @@ export type CommonParams = Partial<
   ValueParams & { items: Item[]; query: string; transaction_id: string }
 >;
 
-export type VendorId = 'meta' | 'ga4' | 'tiktok' | 'linkedin' | 'reddit' | 'x';
+export type VendorId =
+  | 'meta'
+  | 'ga4'
+  | 'tiktok'
+  | 'linkedin'
+  | 'reddit'
+  | 'x'
+  // opt-in adapters (better-tracking/adapters/*), not in the auto bundle
+  | 'pinterest'
+  | 'snap'
+  | 'bing';
 
 export type PageProps = { path?: string; title?: string };
 export type Traits = { user_id?: string; email?: string; phone?: string };
@@ -52,12 +62,49 @@ export interface Adapter {
   detect(): boolean;
   /**
    * `mapped` is the vendor-native event name (or vendor event/conversion id)
-   * resolved by the mapper, undefined for unmapped events. Return `false` to
-   * signal the event was intentionally skipped (e.g. missing required config).
+   * resolved by the mapper, undefined for unmapped events. `eventId` is the
+   * per-event dedup id shared with the server relay (Meta eventID, TikTok
+   * event_id, Reddit conversion_id). Return `false` to signal the event was
+   * intentionally skipped (e.g. missing required config).
    */
-  track(event: string, params: Readonly<EventParams>, mapped: string | undefined): boolean | void;
+  track(
+    event: string,
+    params: Readonly<EventParams>,
+    mapped: string | undefined,
+    eventId: string,
+  ): boolean | void;
   page?(props: Readonly<PageProps>): void;
   identify?(traits: Readonly<Traits>): void;
+}
+
+/** Relay endpoint config: `true` means `/api/events`. */
+export type RelayConfig =
+  | true
+  | string
+  | {
+      url: string;
+      headers?: Record<string, string>;
+      /** Last-chance payload rewrite before send. */
+      transform?: (payload: RelayPayload) => unknown;
+    };
+
+/** Versioned envelope POSTed to the relay endpoint (one event per beacon). */
+export interface RelayPayload {
+  v: 1;
+  event_id: string;
+  type: 'track' | 'page' | 'identify';
+  event?: string;
+  params?: EventParams;
+  props?: PageProps;
+  traits?: Traits;
+  /** epoch ms at track() time */
+  ts: number;
+  url: string;
+  referrer: string;
+  /** vendor cookies + click ids present at init (see collector) */
+  signals: Record<string, string>;
+  /** vendors the pixel path successfully dispatched to (server dedup policy input) */
+  sent: VendorId[];
 }
 
 export interface Config {
@@ -74,6 +121,11 @@ export interface Config {
   map?: Record<string, Partial<Record<VendorId, string>>>;
   /** Auto-fire page_view on history pushState/replaceState/popstate. */
   spa?: boolean;
+  /**
+   * Forward every event to a first-party server endpoint
+   * (better-tracking/server) via sendBeacon/fetch-keepalive. `true` = '/api/events'.
+   */
+  relay?: RelayConfig;
 }
 
 export interface EmitterEvents {
@@ -83,5 +135,8 @@ export interface EmitterEvents {
     type: 'track' | 'page' | 'identify';
     event: string | undefined;
     params: EventParams | undefined;
+    event_id: string;
   };
+  relay: { url: string; payload: RelayPayload };
+  'relay-error': { url: string; error: unknown };
 }

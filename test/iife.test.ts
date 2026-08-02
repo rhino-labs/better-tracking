@@ -21,11 +21,16 @@ describe('IIFE entry', () => {
 
     await import('../src/iife');
 
-    expect(fbq).toHaveBeenCalledWith('track', 'Purchase', expect.objectContaining({ value: 1 }));
+    expect(fbq).toHaveBeenCalledWith(
+      'track',
+      'Purchase',
+      expect.objectContaining({ value: 1 }),
+      { eventID: expect.any(String) },
+    );
 
     // post-load calls go straight through
     (g['bt'] as (...a: unknown[]) => void)('track', 'sign_up');
-    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', {});
+    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', {}, { eventID: expect.any(String) });
   });
 
   it('ignores non-command names and survives malformed queued commands', async () => {
@@ -43,6 +48,6 @@ describe('IIFE entry', () => {
     g['bt'] = stub;
 
     await expect(import('../src/iife')).resolves.toBeDefined();
-    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', {});
+    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', {}, { eventID: expect.any(String) });
   });
 });

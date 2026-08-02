@@ -46,14 +46,18 @@ export const MAPPING = {
   },
   x: {},
   linkedin: {},
-} as const satisfies Record<VendorId, Partial<Record<KnownEvent, string>>>;
+  // opt-in vendors (pinterest/snap/bing) map inside their adapter modules so
+  // their tables tree-shake out of the core bundle
+} as const satisfies Partial<Record<VendorId, Partial<Record<KnownEvent, string>>>>;
 
 // own-property guard (ES2020-compatible Object.hasOwn): a custom event named
 // e.g. 'constructor' must not resolve to Object.prototype members
 export const hasOwn = (obj: object, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(obj, key);
 
-export const mappedName = (vendor: VendorId, event: string): string | undefined =>
-  hasOwn(MAPPING[vendor], event)
-    ? (MAPPING[vendor] as Partial<Record<string, string>>)[event]
+export const mappedName = (vendor: VendorId, event: string): string | undefined => {
+  const table = hasOwn(MAPPING, vendor)
+    ? (MAPPING as Partial<Record<VendorId, Partial<Record<string, string>>>>)[vendor]
     : undefined;
+  return table && hasOwn(table, event) ? table[event] : undefined;
+};

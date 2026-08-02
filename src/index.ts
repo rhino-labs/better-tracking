@@ -1,6 +1,7 @@
 import { adapters } from './adapters';
 import { createTracker } from './core';
 import type {
+  Adapter,
   Config,
   CustomParams,
   EmitterEvents,
@@ -21,6 +22,8 @@ export type {
   Item,
   KnownEvent,
   PageProps,
+  RelayConfig,
+  RelayPayload,
   Traits,
   ValueParams,
   VendorId,
@@ -70,4 +73,15 @@ export function on<K extends keyof EmitterEvents>(
 
 export function detected(): VendorId[] {
   return tracker.detected();
+}
+
+/**
+ * Register an opt-in adapter that isn't in the auto bundle:
+ *
+ *   import { use } from 'better-tracking';
+ *   import { pinterest } from 'better-tracking/adapters/pinterest';
+ *   use(pinterest);
+ */
+export function use(adapter: Adapter): void {
+  tracker.use(adapter);
 }

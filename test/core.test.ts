@@ -42,6 +42,7 @@ describe('detection & dispatch', () => {
         contents: [{ id: 'sku1', quantity: 1, item_price: 49.99 }],
         content_type: 'product',
       }),
+      { eventID: expect.any(String) },
     );
     expect(gtag).toHaveBeenCalledWith('event', 'purchase', expect.objectContaining({ value: 49.99 }));
     expect(ttqTrack).toHaveBeenCalledWith(
@@ -50,6 +51,7 @@ describe('detection & dispatch', () => {
         value: 49.99,
         contents: [{ content_id: 'sku1', content_name: undefined, quantity: 1, price: 49.99 }],
       }),
+      { event_id: expect.any(String) },
     );
     expect(rdt).toHaveBeenCalledWith(
       'track',
@@ -66,7 +68,7 @@ describe('detection & dispatch', () => {
     expect(fbq).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(600); // first retry probe at 500ms
-    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', { method: 'email' });
+    expect(fbq).toHaveBeenCalledWith('track', 'CompleteRegistration', { method: 'email' }, { eventID: expect.any(String) });
   });
 
   it('re-probes on track() and replays the backlog to a late-detected vendor only once', () => {
@@ -93,7 +95,7 @@ describe('detection & dispatch', () => {
     const fbq = (g['fbq'] = makeFbq());
     vi.advanceTimersByTime(600);
     expect(fbq).toHaveBeenCalledTimes(50);
-    expect(fbq).toHaveBeenNthCalledWith(1, 'trackCustom', 'e10', {});
+    expect(fbq).toHaveBeenNthCalledWith(1, 'trackCustom', 'e10', {}, { eventID: expect.any(String) });
   });
 
   it('evicts fully-delivered history before pending events on overflow', () => {
@@ -130,7 +132,13 @@ describe('detection & dispatch', () => {
 
     expect(detects).toEqual([{ vendor: 'meta' }]);
     expect(dispatches).toEqual([
-      { vendor: 'meta', type: 'track', event: 'search', params: { query: 'shoes' } },
+      {
+        vendor: 'meta',
+        type: 'track',
+        event: 'search',
+        params: { query: 'shoes' },
+        event_id: expect.any(String),
+      },
     ]);
   });
 });
@@ -149,15 +157,19 @@ describe('vendor specifics', () => {
     const rdt = (g['rdt'] = vi.fn());
     const t = createTracker(adapters);
     t.track('demo_booked', { plan: 'pro' });
-    expect(fbq).toHaveBeenCalledWith('trackCustom', 'demo_booked', { plan: 'pro' });
-    expect(rdt).toHaveBeenCalledWith('track', 'Custom', { plan: 'pro', customEventName: 'demo_booked' });
+    expect(fbq).toHaveBeenCalledWith('trackCustom', 'demo_booked', { plan: 'pro' }, { eventID: expect.any(String) });
+    expect(rdt).toHaveBeenCalledWith(
+      'track',
+      'Custom',
+      expect.objectContaining({ plan: 'pro', customEventName: 'demo_booked' }),
+    );
   });
 
   it('maps query to search_string for Meta', () => {
     const fbq = (g['fbq'] = makeFbq());
     const t = createTracker(adapters);
     t.track('search', { query: 'shoes' });
-    expect(fbq).toHaveBeenCalledWith('track', 'Search', { search_string: 'shoes' });
+    expect(fbq).toHaveBeenCalledWith('track', 'Search', { search_string: 'shoes' }, { eventID: expect.any(String) });
   });
 
   it('skips x/linkedin without config.map, fires once configured', () => {
@@ -184,8 +196,12 @@ describe('vendor specifics', () => {
     const t = createTracker(adapters);
     t.track('constructor');
     t.track('hasOwnProperty');
-    expect(fbq).toHaveBeenCalledWith('trackCustom', 'constructor', {});
-    expect(rdt).toHaveBeenCalledWith('track', 'Custom', { customEventName: 'hasOwnProperty' });
+    expect(fbq).toHaveBeenCalledWith('trackCustom', 'constructor', {}, { eventID: expect.any(String) });
+    expect(rdt).toHaveBeenCalledWith(
+      'track',
+      'Custom',
+      expect.objectContaining({ customEventName: 'hasOwnProperty' }),
+    );
   });
 
   it('does not treat a bare function without queue/callMethod as a Meta pixel', () => {
@@ -241,7 +257,7 @@ describe('config', () => {
     const t = createTracker(adapters);
     t.configure({ map: { demo_booked: { meta: 'Schedule' } } });
     t.track('demo_booked');
-    expect(fbq).toHaveBeenCalledWith('track', 'Schedule', {});
+    expect(fbq).toHaveBeenCalledWith('track', 'Schedule', {}, { eventID: expect.any(String) });
   });
 
   it('a throwing adapter never breaks the page or other vendors', () => {

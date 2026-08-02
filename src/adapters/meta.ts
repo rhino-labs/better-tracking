@@ -28,11 +28,14 @@ export const meta: Adapter = {
   id: 'meta',
   // A valid stub (pre-SDK snippet) counts as detected: calling it queues natively.
   detect: () => typeof g.fbq === 'function' && !!(g.fbq.callMethod ?? g.fbq.queue),
-  track(event, params, mapped) {
+  track(event, params, mapped, eventId) {
     const fbq = g.fbq;
     if (!fbq) return false;
-    if (mapped !== undefined) fbq('track', mapped, toMetaParams(params));
-    else fbq('trackCustom', event, toMetaParams(params));
+    // eventID pairs with the server relay's event_id for CAPI dedup
+    const p = toMetaParams(params);
+    const opt = { eventID: eventId };
+    if (mapped !== undefined) fbq('track', mapped, p, opt);
+    else fbq('trackCustom', event, p, opt);
   },
   page() {
     g.fbq?.('track', 'PageView');

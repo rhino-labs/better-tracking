@@ -12,11 +12,13 @@ function toRedditParams(params: Readonly<EventParams>): Record<string, unknown> 
 export const reddit: Adapter = {
   id: 'reddit',
   detect: () => typeof g.rdt === 'function',
-  track(event, params, mapped) {
+  track(event, params, mapped, eventId) {
     const rdt = g.rdt;
     if (!rdt) return false;
-    if (mapped !== undefined) rdt('track', mapped, toRedditParams(params));
-    else rdt('track', 'Custom', { ...toRedditParams(params), customEventName: event });
+    // conversionId pairs with the server relay's event_id for CAPI dedup
+    const p = { ...toRedditParams(params), conversionId: eventId };
+    if (mapped !== undefined) rdt('track', mapped, p);
+    else rdt('track', 'Custom', { ...p, customEventName: event });
   },
   page() {
     g.rdt?.('track', 'PageVisit');

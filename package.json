@@ -17,9 +17,28 @@
       "types": "./dist/adapters/*.d.ts",
       "import": "./dist/adapters/*.js"
     },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "import": "./dist/next.js"
+    },
+    "./tanstack-start": {
+      "types": "./dist/tanstack-start.d.ts",
+      "import": "./dist/tanstack-start.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    },
     "./bt.js": {
       "types": "./dist/bt.d.ts",
       "default": "./dist/bt.js"
+    },
+    "./bt.debug.js": {
+      "default": "./dist/bt.debug.js"
     },
     "./package.json": "./package.json"
   },

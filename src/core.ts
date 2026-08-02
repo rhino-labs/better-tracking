@@ -1,10 +1,12 @@
 import { hasOwn, mappedName } from './mapping';
+import { captureClickIds, collectSignals } from './signals';
 import type {
   Adapter,
   Config,
   EmitterEvents,
   EventParams,
   PageProps,
+  RelayPayload,
   Traits,
   VendorId,
 } from './types';
@@ -14,12 +16,19 @@ const PROBE_DELAYS = [500, 1500, 3000, 6000, 12000];
 
 interface Entry {
   kind: 'track' | 'page' | 'identify';
+  id: string;
+  ts: number;
   event?: string;
   params?: EventParams;
   props?: PageProps;
   traits?: Traits;
   sent: Partial<Record<VendorId, true>>;
+  relayed?: boolean;
 }
+
+const newId = (): string =>
+  globalThis.crypto?.randomUUID?.() ??
+  Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 
 export interface Tracker {
   track(event: string, params?: EventParams): void;
@@ -28,9 +37,12 @@ export interface Tracker {
   configure(config: Config): void;
   on<K extends keyof EmitterEvents>(name: K, fn: (payload: EmitterEvents[K]) => void): () => void;
   detected(): VendorId[];
+  /** Register an opt-in adapter (e.g. better-tracking/adapters/pinterest). */
+  use(adapter: Adapter): void;
 }
 
-export function createTracker(adapters: readonly Adapter[]): Tracker {
+export function createTracker(initial: readonly Adapter[]): Tracker {
+  const adapters: Adapter[] = [...initial];
   const cfg: Config = {};
   const found = new Set<VendorId>();
   const log: Entry[] = [];
@@ -48,8 +60,6 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
     }
   };
 
-  const enabled = (id: VendorId): boolean => !cfg.disable?.includes(id);
-
   const consentOk = (): boolean => {
     try {
       return cfg.consent ? cfg.consent() === true : true;
@@ -58,21 +68,19 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
     }
   };
 
-  const override = (event: string, id: VendorId): string | undefined => {
-    const m = cfg.map;
-    return m && hasOwn(m, event) ? m[event]?.[id] : undefined;
-  };
-
   const deliver = (adapter: Adapter, entry: Entry): void => {
     entry.sent[adapter.id] = true;
     try {
       if (entry.kind === 'track' && entry.event !== undefined) {
-        const mapped = override(entry.event, adapter.id) ?? mappedName(adapter.id, entry.event);
-        if (adapter.track(entry.event, entry.params ?? {}, mapped) === false) {
+        const m = cfg.map;
+        const mapped =
+          (m && hasOwn(m, entry.event) ? m[entry.event]?.[adapter.id] : undefined) ??
+          mappedName(adapter.id, entry.event);
+        if (adapter.track(entry.event, entry.params ?? {}, mapped, entry.id) === false) {
           // intentional skip (missing config.map id): leave unsent so a later
           // configure({ map }) can replay it
           delete entry.sent[adapter.id];
-          if (cfg.debug) console.info('[bt] skipped (needs config.map)', adapter.id, entry.event);
+          if (cfg.debug) console.info('[bt] skip: needs config.map', adapter.id, entry.event);
           return;
         }
       } else if (entry.kind === 'page') {
@@ -82,15 +90,58 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
         if (!adapter.identify || !entry.traits) return;
         adapter.identify(entry.traits);
       }
-      if (cfg.debug) console.info('[bt]', entry.kind, adapter.id, entry.event ?? '', entry.params ?? entry.props ?? entry.traits);
+      if (cfg.debug) console.info('[bt]', adapter.id, entry.event ?? entry.kind);
       emit('dispatch', {
         vendor: adapter.id,
         type: entry.kind,
         event: entry.event,
         params: entry.params,
+        event_id: entry.id,
       });
     } catch (e) {
-      if (cfg.debug) console.warn('[bt] dispatch failed', adapter.id, e);
+      if (cfg.debug) console.warn('[bt] fail', adapter.id, e);
+    }
+  };
+
+  const relay = (entry: Entry): void => {
+    const r = cfg.relay;
+    if (r === undefined) return;
+    const custom = typeof r === 'object' ? r : undefined;
+    const url = r === true ? '/api/events' : typeof r === 'string' ? r : r.url;
+    entry.relayed = true;
+    const payload: RelayPayload = {
+      v: 1,
+      event_id: entry.id,
+      type: entry.kind,
+      ts: entry.ts,
+      url: globalThis.location?.href ?? '',
+      referrer: globalThis.document?.referrer ?? '',
+      signals: collectSignals(),
+      sent: Object.keys(entry.sent) as VendorId[],
+    };
+    if (entry.event !== undefined) payload.event = entry.event;
+    if (entry.params !== undefined) payload.params = entry.params;
+    if (entry.props !== undefined) payload.props = entry.props;
+    if (entry.traits !== undefined) payload.traits = entry.traits;
+    try {
+      const body = JSON.stringify(custom?.transform ? custom.transform(payload) : payload);
+      let ok = false;
+      // sendBeacon survives unload/bounce but can't carry headers
+      if (!custom?.headers && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        ok = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      }
+      if (!ok) {
+        fetch(url, {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'content-type': 'application/json', ...custom?.headers },
+          body,
+        }).catch((error: unknown) => emit('relay-error', { url, error }));
+      }
+      emit('relay', { url, payload });
+    } catch (error) {
+      emit('relay-error', { url, error });
+      if (cfg.debug) console.warn('[bt] relay fail', error);
     }
   };
 
@@ -98,7 +149,7 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
     if (!consentOk()) {
       // consent may be granted with no further track/configure call (e.g. a
       // CMP banner click); poll while events are pending so they still flush
-      if (cfg.consent && log.length > 0 && consentTimer === undefined && typeof setTimeout === 'function') {
+      if (cfg.consent && log.length > 0 && consentTimer === undefined) {
         consentTimer = setTimeout(() => {
           consentTimer = undefined;
           flush();
@@ -108,10 +159,13 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
     }
     for (const entry of log) {
       for (const adapter of adapters) {
-        if (found.has(adapter.id) && enabled(adapter.id) && !entry.sent[adapter.id]) {
+        if (found.has(adapter.id) && !cfg.disable?.includes(adapter.id) && !entry.sent[adapter.id]) {
           deliver(adapter, entry);
         }
       }
+      // relay after the pixel pass so `sent` reflects what pixels received
+      // (the server's dedup policy input, e.g. GA4 fallback-only)
+      if (!entry.relayed) relay(entry);
     }
   };
 
@@ -145,9 +199,10 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
   };
 
   const api: Tracker = {
-    track: (event, params) => push({ kind: 'track', event, params: params ?? {}, sent: {} }),
-    page: (props) => push({ kind: 'page', props: props ?? {}, sent: {} }),
-    identify: (traits) => push({ kind: 'identify', traits, sent: {} }),
+    track: (event, params) =>
+      push({ kind: 'track', id: newId(), ts: Date.now(), event, params: params ?? {}, sent: {} }),
+    page: (props) => push({ kind: 'page', id: newId(), ts: Date.now(), props: props ?? {}, sent: {} }),
+    identify: (traits) => push({ kind: 'identify', id: newId(), ts: Date.now(), traits, sent: {} }),
     configure: (config) => {
       Object.assign(cfg, config);
       if (cfg.spa) patchSpa();
@@ -164,6 +219,12 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
       };
     },
     detected: () => [...found],
+    use: (adapter) => {
+      if (adapters.some((a) => a.id === adapter.id)) return;
+      adapters.push(adapter);
+      probe();
+      flush();
+    },
   };
 
   const patchSpa = (): void => {
@@ -180,6 +241,8 @@ export function createTracker(adapters: readonly Adapter[]): Tracker {
     addEventListener('popstate', fire);
   };
 
+  // click ids only exist on the landing URL — capture before any SPA navigation
+  captureClickIds();
   // defer the initial probe one microtask so callers registering on('detect')
   // synchronously after creation still see init-time detections
   if (typeof queueMicrotask === 'function') queueMicrotask(probe);
