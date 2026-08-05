@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRelay } from '../src/server/index';
+import { createRelay, signalsFromCookies } from '../src/server/index';
 import { oauth1Header } from '../src/server/oauth1';
 import { hashEmail, normalizePhone, sha256Hex } from '../src/hash';
 import { okFetch, relayPayload as payload, relayRequest as post, sentRequest } from './helpers';
@@ -79,6 +79,37 @@ describe('ga4 sender dedup policy', () => {
     expect(url).toContain('measurement_id=G-1');
     expect(body.client_id).toBe('111.222');
     expect(body.events[0]).toMatchObject({ name: 'purchase' });
+  });
+
+  it('imperative send() threads signals through — webhook purchase reaches GA4', async () => {
+    const f = okFetch();
+    const relay = createRelay({ ga4: { measurementId: 'G-1', apiSecret: 's' }, fetch: f });
+    await relay.send(
+      'purchase',
+      { value: 49, currency: 'USD', session_id: '1700000000' },
+      { event_id: 'cs_test_1', signals: { _ga: 'GA1.1.333.444' } },
+    );
+    const { body } = sentRequest(f);
+    expect(body.client_id).toBe('333.444');
+    expect(body.events[0].params.session_id).toBe('1700000000');
+  });
+
+  it('accepts a pre-derived ga_client_id instead of the _ga cookie', async () => {
+    const f = okFetch();
+    const relay = createRelay({ ga4: { measurementId: 'G-1', apiSecret: 's' }, fetch: f });
+    await relay.send('purchase', { value: 1, currency: 'USD' }, {
+      signals: { ga_client_id: '555.666' },
+    });
+    const { body } = sentRequest(f);
+    expect(body.client_id).toBe('555.666');
+  });
+
+  it('skips with a reason when send() has no GA4 client_id signal', async () => {
+    const f = okFetch();
+    const relay = createRelay({ ga4: { measurementId: 'G-1', apiSecret: 's' }, fetch: f });
+    const results = await relay.send('purchase', { value: 1, currency: 'USD' });
+    expect(results[0]).toMatchObject({ vendor: 'ga4', ok: true, skipped: expect.any(String) });
+    expect(f).not.toHaveBeenCalled();
   });
 
   it("mode: 'always' sends even when the pixel delivered", async () => {
@@ -187,6 +218,33 @@ describe('config-gated vendors', () => {
       custom_event_name: 'demo_booked',
     });
     expect(body.events[0].event_metadata.conversion_id).toBe('e9');
+  });
+});
+
+describe('signalsFromCookies', () => {
+  it('extracts only the relevant signal cookies from a Cookie header', () => {
+    const out = signalsFromCookies(
+      '_ga=GA1.1.111.222; session=abc; _fbp=fb.1.123; _fbc=fb.1.456.IwAR; theme=dark',
+    );
+    expect(out).toEqual({ _ga: 'GA1.1.111.222', _fbp: 'fb.1.123', _fbc: 'fb.1.456.IwAR' });
+  });
+
+  it('accepts a parsed cookie record and tolerates null/undefined', () => {
+    expect(signalsFromCookies({ _ga: 'GA1.1.1.2', other: 'x', _ttp: undefined })).toEqual({
+      _ga: 'GA1.1.1.2',
+    });
+    expect(signalsFromCookies(null)).toEqual({});
+    expect(signalsFromCookies(undefined)).toEqual({});
+  });
+
+  it('round-trips into send() for Meta match signals', async () => {
+    const f = okFetch();
+    const relay = createRelay({ meta: { pixelId: '1', accessToken: 't' }, fetch: f });
+    await relay.send('purchase', { value: 1, currency: 'USD' }, {
+      signals: signalsFromCookies('_fbp=fb.1.123; _fbc=fb.1.456'),
+    });
+    const { body } = sentRequest(f);
+    expect(body.data[0].user_data).toMatchObject({ fbp: 'fb.1.123', fbc: 'fb.1.456' });
   });
 });
 

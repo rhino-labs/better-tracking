@@ -27,7 +27,7 @@ export interface ServerEvent {
   ts: number;
   url: string;
   referrer: string;
-  /** vendor cookies + click ids captured by the client collector */
+  /** vendor cookies + click ids, from the client collector or SendOptions.signals */
   signals: Record<string, string>;
   /** vendors the client pixel path already delivered to (dedup policy input) */
   sent: VendorId[];

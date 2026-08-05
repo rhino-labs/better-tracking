@@ -39,6 +39,7 @@ export type {
   XConfig,
 } from './types';
 export { oauth1Header } from './oauth1';
+export { signalsFromCookies } from './signals';
 export { hashEmail, hashPhone, normalizeEmail, normalizePhone, sha256Hex } from '../hash';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -48,6 +49,15 @@ export interface SendOptions {
   event_id?: string;
   /** Raw identity — normalized and SHA-256 hashed before any vendor call. */
   user?: UserTraits;
+  /**
+   * Match signals captured client-side and stashed for later (e.g. in Stripe
+   * metadata at checkout creation): vendor cookies (`_ga`, `_fbp`, `_fbc`,
+   * `_ttp`), click ids (`fbclid`, `ttclid`, …), or a pre-derived GA4
+   * `ga_client_id`. Use `signalsFromCookies()` to extract them from a Cookie
+   * header. Without them, GA4 skips the event (Measurement Protocol requires
+   * a client_id) and Meta/LinkedIn/TikTok match quality degrades.
+   */
+  signals?: Record<string, string>;
   /** epoch ms (defaults to now) */
   ts?: number;
   ip?: string;
@@ -211,7 +221,7 @@ export function createRelay(options: RelayOptions): Relay {
         ts: opts?.ts ?? Date.now(),
         url: opts?.url ?? '',
         referrer: '',
-        signals: {},
+        signals: opts?.signals ?? {},
         sent: [],
         user: await hashTraits(opts?.user),
       };

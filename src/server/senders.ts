@@ -82,11 +82,13 @@ export function ga4Sender(cfg: Ga4Config, fetchImpl: typeof fetch): Sender {
     // the fan-out enforces the mode
     mode: cfg.mode ?? 'fallback',
     async send(e) {
-      // _ga cookie: "GA1.1.123456789.1700000000" → client_id "123456789.1700000000"
+      // servers often store the derived client_id rather than the cookie —
+      // accept it directly as signals.ga_client_id, else derive from _ga:
+      // "GA1.1.123456789.1700000000" → client_id "123456789.1700000000"
       const ga = e.signals['_ga'];
-      const clientId = ga?.split('.').slice(-2).join('.');
+      const clientId = e.signals['ga_client_id'] ?? ga?.split('.').slice(-2).join('.');
       if (clientId === undefined || clientId === '') {
-        return 'no _ga client_id (required by Measurement Protocol)';
+        return 'no GA4 client_id (pass signals._ga or signals.ga_client_id — required by Measurement Protocol)';
       }
       const url = `${GA4_URL}?measurement_id=${encodeURIComponent(cfg.measurementId)}&api_secret=${encodeURIComponent(cfg.apiSecret)}`;
       await postJson(

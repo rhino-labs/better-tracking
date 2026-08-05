@@ -235,6 +235,59 @@ PII is hashed at ingest and never persisted. Retries are bounded (3 attempts on
 429/5xx), one vendor's failure never blocks the others, and GA4 defaults to
 **fallback-only** (sent only when the gtag pixel didn't fire — GA4 has no dedup).
 
+### Server-originated conversions with match signals (Stripe webhooks etc.)
+
+When the conversion is only confirmed server-side (a `checkout.session.completed`
+webhook, an offline sale) the buyer may never return to your site, so the vendor
+cookies that power matching must be captured **earlier** — at checkout creation —
+and replayed on `send()` via `SendOptions.signals`:
+
+```ts
+import { createRelay, signalsFromCookies } from 'better-tracking/server';
+
+// 1. At checkout-session creation (the visitor's request is in hand):
+//    extract the signal cookies and stash them where the webhook can see them.
+const signals = signalsFromCookies(req.headers.get('cookie'));
+// → { _ga, _fbp, _fbc, _ttp, plus fbclid/ttclid/gclid/… if present as cookies }
+await stripe.checkout.sessions.create({
+  // …
+  metadata: { ...signals, url: req.url, ua: req.headers.get('user-agent') ?? '' },
+});
+
+// 2. In the webhook handler: replay them.
+const { _ga, _fbp, _fbc } = session.metadata;
+await relay.send('purchase', {
+  value: 49, currency: 'USD',
+  session_id: gaSessionId,           // see GA4 session attribution below
+}, {
+  event_id: session.id,              // Stripe session id = natural dedup key
+  user: { email, external_id },
+  signals: { _ga, _fbp, _fbc },
+  ip, ua, url,
+});
+```
+
+`signalsFromCookies()` accepts a raw `Cookie` header string or an already-parsed
+name → value record, and returns only the cookies the senders consume — the same
+list the client beacon captures, so the two never drift.
+
+**GA4 specifics:**
+
+- **client_id is required.** Without `signals._ga` (or `ga_client_id`, below) the
+  GA4 sender skips the event and says so in the `SendResult.skipped` reason —
+  Measurement Protocol rejects events without one. Meta/LinkedIn/TikTok still send
+  without signals, but match quality degrades.
+- **Already store the derived client_id?** Pass it directly instead of the raw
+  cookie: `signals: { ga_client_id: '123456789.1700000000' }`.
+- **Session attribution:** Measurement Protocol events only join a GA4 session —
+  and therefore attribute to a traffic source — when the event's params include the
+  `session_id` the gtag client assigned. Capture it client-side at checkout
+  creation (`gtag('get', 'G-XXX', 'session_id', cb)`) and stash it alongside the
+  cookies; without it the purchase lands unattributed.
+- Imperative `send()` events have an empty `sent` list, so GA4's default
+  **fallback** mode always sends them — no pixel could have delivered a
+  webhook-originated event.
+
 **Framework wrappers** (zero relay logic, just route idioms):
 
 ```ts

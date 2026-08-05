@@ -4,8 +4,7 @@
  * no storage, no PII. Cookies are re-read per event (pixels set them late).
  */
 
-const COOKIES = ['_fbp', '_fbc', '_ga', '_ttp'] as const;
-const CLICK_IDS = ['fbclid', 'ttclid', 'li_fat_id', 'rdt_cid', 'twclid', 'gclid'] as const;
+import { CLICK_IDS, SIGNAL_COOKIES as COOKIES } from './signal-names';
 
 let clickIds: Record<string, string> | undefined;
 
